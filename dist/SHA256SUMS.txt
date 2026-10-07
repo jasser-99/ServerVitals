@@ -1,0 +1,2 @@
+6dd43f10f51e89508d25339b11e6c828e8de6f0c4011e6c034e3464834b872da  betterdiscord/ServerVitals.plugin.js
+2741c3552ae2405b93e6e99d652894f4e0c54dbdb766156ed544d2c5ac41151a  ServerVitals-Vencord.zip

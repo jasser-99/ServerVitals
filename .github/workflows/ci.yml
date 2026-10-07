@@ -1,0 +1,40 @@
+name: Validate alpha
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  shared-and-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ServerVitals-testing-build
+          path: dist/
+  vencord-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/checkout@v4
+        with:
+          repository: Vendicated/Vencord
+          ref: 718c867256a9d181edc7a534afb296b9bb41ab58
+          path: .validation/Vencord
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+        working-directory: .validation/Vencord
+      - run: npm run validate:vencord

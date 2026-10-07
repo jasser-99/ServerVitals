@@ -1,0 +1,39 @@
+{
+  "name": "servervitals",
+  "version": "0.1.0-alpha.1",
+  "private": true,
+  "description": "Find the servers that have gone quiet.",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint packages tests scripts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build && npm run test:artifacts",
+    "validate:vencord": "node scripts/validate-vencord.mjs",
+    "test:ui": "node scripts/test-ui.mjs",
+    "test:artifacts": "node scripts/test-artifacts.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@types/node": "^22.18.0",
+    "@types/react": "^19.1.0",
+    "esbuild": "^0.25.10",
+    "eslint": "^9.39.0",
+    "fflate": "^0.8.3",
+    "globals": "^16.4.0",
+    "playwright": "^1.64.0",
+    "prettier": "^3.6.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.45.0"
+  }
+}
