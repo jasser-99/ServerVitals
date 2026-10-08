@@ -1,6 +1,6 @@
 # Install the Vencord custom userplugin
 
-**Testing build: 0.1.0-alpha.2.** This release has not completed the maintainer's manual stability checklist. Initial implementation: 100% AI generated using OpenAI Codex. Independently distributed; not an official Vencord plugin.
+**Testing build: 0.1.0-alpha.3.** This release has not completed the maintainer's manual stability checklist. Initial implementation: 100% AI generated using OpenAI Codex. Independently distributed; not an official Vencord plugin.
 
 Follow the current [Vencord source installation guide](https://docs.vencord.dev/installing/) and [custom plugin guide](https://docs.vencord.dev/installing/custom-plugins/), verified 2026-10-07. Custom plugins require your own source build. Standard installer builds cannot load this folder directly.
 

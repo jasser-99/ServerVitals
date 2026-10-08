@@ -89,7 +89,10 @@ try {
   await page.getByRole("searchbox").fill("counter");
   assert.equal(await page.locator("tbody tr").count(), 1);
   await page.getByRole("searchbox").fill("");
-  await page.getByLabel("Sort by").selectOption("largest");
+  await page.getByLabel("Sort by", { exact: true }).click();
+  await page
+    .getByRole("button", { name: "Largest Server First", exact: true })
+    .click();
   assert.match(
     await page.locator("tbody tr").first().innerText(),
     /Counter Strike Community/,
@@ -155,10 +158,38 @@ try {
     .getByRole("button", { name: "Open ServerVitals", exact: true })
     .click();
   assert.equal(await page.locator("tbody tr").count(), 0);
-  const dialog = await page
-    .getByRole("dialog", { name: "ServerVitals", exact: true })
-    .boundingBox();
-  assert.ok(dialog.width > 700 && dialog.height > 900);
+  const dialog = await page.locator(".bd-modal-root").boundingBox();
+  assert.ok(dialog.width > 700 && dialog.height > 850);
+  await page.getByRole("button", { name: "Check Now", exact: true }).click();
+  await page.locator("tbody tr").first().waitFor();
+  await page.getByRole("searchbox").fill("not matching");
+  assert.equal(await page.locator("tbody tr").count(), 0);
+  await page.getByRole("searchbox").fill("Test");
+  assert.equal(await page.locator("tbody tr").count(), 1);
+  await page.getByLabel("Sort by", { exact: true }).click();
+  await page
+    .getByRole("button", { name: "Newest Activity First", exact: true })
+    .click();
+  await page.getByLabel("Select Test server to leave", { exact: true }).check();
+  await page
+    .getByRole("button", { name: "Leave selected servers (1)", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Cancel leaving", exact: true })
+    .click();
+  assert.equal(await page.locator("tbody tr").count(), 1);
+  await page
+    .getByRole("button", { name: "Leave selected servers (1)", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Confirm leave 1 servers", exact: true })
+    .click();
+  await page.getByText(/Left 1 server\(s\)/).waitFor();
+  assert.equal(await page.locator("tbody tr").count(), 0);
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Open ServerVitals", exact: true })
+    .click();
   await page.getByRole("button", { name: "Check Now", exact: true }).click();
   await page.locator("tbody tr").first().waitFor();
   await page
@@ -171,7 +202,7 @@ try {
   assert.equal(await page.getByTestId("plugin-settings").count(), 0);
   assert.equal(
     await page
-      .getByRole("dialog", { name: "ServerVitals", exact: true })
+      .getByRole("region", { name: "ServerVitals", exact: true })
       .count(),
     0,
   );

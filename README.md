@@ -4,7 +4,7 @@
 
 ServerVitals shows the **Last Visible Activity** across your Discord servers, helping you identify active, quiet, inactive and dormant communities from one local dashboard. Separate implementations support **BetterDiscord** and a **Vencord custom userplugin**. No fixed server-count limit is imposed.
 
-> **Testing Build — 0.1.0-alpha.2**
+> **Testing Build — 0.1.0-alpha.3**
 >
 > This release has not completed the maintainer's manual stability checklist. Automated tests and source builds do not establish live Discord compatibility or stability. No stable release is published automatically.
 
@@ -115,9 +115,21 @@ Activity advancement is called **New visible activity detected**. Category trans
 
 Four increasing day thresholds are configurable in the dashboard. Fixed named statistics/filter ranges keep their documented values.
 
+## Manual checks and cache size
+
+**Check Now** inspects currently loaded Discord metadata. Enabling the plugin or opening the dashboard loads saved results without running a scan. Automatic refresh is currently removed.
+
+The cache stores only the **current scan and previous scan**, plus local Keep preferences. Each successful check replaces these snapshots; it does not append a permanent history or collect message text. Cache size depends on the number of servers and stored metadata, rather than the total number of checks. Settings shows UTF-8 cache bytes (host storage may add overhead). Clearing the cache preserves Keep and leaves observations empty until Check Now is clicked.
+
+## Leaving selected servers
+
+Use row checkboxes to select servers, or **Select matching servers** to select the currently filtered results across pages. Selection may include rows hidden by later filter changes; the confirmation lists every target by name. Click **Leave selected servers**, inspect the names, then explicitly confirm. Individual rows also have **Leave server**.
+
+Keep servers are protected. Known owned servers are blocked until ownership is transferred through Discord. Leaving may require a new invitation to rejoin. Confirmed batches use Discord’s existing client action, run sequentially with 1.5 seconds between actions, and stop at the first error without retrying. They are never triggered by activity categories, checks, or timers. Closing/disabling the plugin stops subsequent actions; an already sent action cannot be undone.
+
 ## Privacy
 
-Local only. No token access, message-body collection, telemetry, analytics, backend, external search or data upload. No automated messages, joins, leaves or deletes. Current/previous snapshots and Keep persist in local host storage, separated by account. Exports stay local until you choose to share them.
+Local only. No token access, message-body collection, telemetry, analytics, backend, external search or data upload. No unsolicited membership changes, messages, joins or deletes. Leaving servers is an explicit user-confirmed action through Discord’s existing client function; confirmed batches run sequentially and stop on error. Current/previous snapshots and Keep persist in local host storage, separated by account. Exports stay local until you choose to share them.
 
 Read [PRIVACY.md](docs/PRIVACY.md) for stored fields, CDN/navigation details and deletion behavior. Changes to privacy behavior require updated documentation before release.
 
@@ -162,11 +174,11 @@ npm run check
 
 `packages/core` holds pure logic, `packages/discord` the scanner/controller, `packages/ui` the shared React view, and platform folders the adapters. `npm run build` produces the normal BetterDiscord plugin and a self-contained Vencord userplugin source folder. Runtime React comes from the host. Read [ARCHITECTURE.md](docs/ARCHITECTURE.md) for research, decisions and internal dependencies.
 
-Versions are synchronized at **0.1.0-alpha.2**. CI validates code/builds without publishing stable releases. Alpha publication is independent of upstream plugin directories.
+Versions are synchronized at **0.1.0-alpha.3**. CI validates code/builds without publishing stable releases. Alpha publication is independent of upstream plugin directories.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Disclose AI assistance, understand/review changes, preserve the initial-implementation disclosure and maintain local read-only behavior. Report security issues using [SECURITY.md](SECURITY.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md). Disclose AI assistance, understand/review changes, preserve the initial-implementation disclosure and maintain local read-only scanning and explicit membership confirmation. Report security issues using [SECURITY.md](SECURITY.md).
 
 ## License
 

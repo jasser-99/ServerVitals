@@ -17,6 +17,7 @@ export class Controller {
   cache: Cache = emptyCache();
   settings = migrateSettings(null);
   scanning = false;
+  private leaving = false;
   enabled = false;
   error: string | null = null;
   diagnostics: { [name: string]: boolean } = {};
@@ -156,14 +157,84 @@ export class Controller {
     await this.save("cache");
   }
   async resetCache() {
-    if (!this.enabled) return;
+    if (!this.enabled || this.leaving) return;
     this.cache = { ...emptyCache(), keeps: this.cache.keeps };
     this.baseline = null;
     this.emit();
     await this.save("cache");
   }
+  async leaveSelected(ids: string[], leave: (id: string) => Promise<void>) {
+    const left: string[] = [];
+    if (this.leaving)
+      return { left, error: "A confirmed leave operation is already running." };
+    this.leaving = true;
+    const generation = this.generation;
+    try {
+      if (
+        !this.enabled ||
+        this.scanning ||
+        accountId(this.stores) !== this.account
+      )
+        throw new Error(
+          "Leaving is unavailable during a scan or account change.",
+        );
+      const targets = [...new Set(ids)];
+      if (!targets.length) throw new Error("Select a server first.");
+      const validate = (id: string) => {
+        if (
+          !this.enabled ||
+          generation !== this.generation ||
+          accountId(this.stores) !== this.account
+        )
+          throw new Error(
+            "Leaving stopped because the plugin or account changed.",
+          );
+        const guild = this.stores.GuildStore?.getGuilds()[id];
+        if (
+          !guild ||
+          !this.cache.current?.records.some((r) => r.guildId === id)
+        )
+          throw new Error(
+            "A selected server is no longer available. Check Now and try again.",
+          );
+        if (this.cache.keeps.includes(id))
+          throw new Error("Keep servers are protected from leaving.");
+        if ((guild.ownerId ?? guild.owner_id) === this.account)
+          throw new Error(
+            "You own a selected server. Transfer ownership through Discord before leaving.",
+          );
+      };
+      for (const id of targets) validate(id);
+      for (const id of targets) {
+        validate(id);
+        await leave(id);
+        left.push(id);
+        if (!this.enabled || generation !== this.generation) break;
+        if (this.cache.current)
+          this.cache.current = {
+            ...this.cache.current,
+            records: this.cache.current.records.filter((r) => r.guildId !== id),
+          };
+        this.emit();
+        await this.save("cache");
+        if (id !== targets[targets.length - 1])
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+      return { left, error: null };
+    } catch (error) {
+      return {
+        left,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Leaving failed. No automatic retry was attempted.",
+      };
+    } finally {
+      this.leaving = false;
+    }
+  }
   async refresh() {
-    if (!this.enabled || this.scanning) return;
+    if (!this.enabled || this.scanning || this.leaving) return;
     const generation = this.generation;
     this.scanning = true;
     this.error = null;

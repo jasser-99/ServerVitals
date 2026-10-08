@@ -1,6 +1,6 @@
 # ServerVitals architecture
 
-Version: **0.1.0-alpha.2**. Documentation and source researched on 2026-10-07.
+Version: **0.1.0-alpha.3**. Documentation and source researched on 2026-10-07.
 
 ## Research and decisions
 
@@ -12,7 +12,7 @@ Primary references:
 
 BetterDiscord prohibits automatically generated official addon submissions. Vencord currently requires disclosure, human understanding and review of AI-assisted contributions; its policy is not a blanket ban on all AI assistance. This entirely AI-generated initial implementation is independently distributed and will not be submitted to either project. These upstream policies may change.
 
-Use a small TypeScript repository, not package workspaces. `packages/core` contains pure models and algorithms. `packages/discord` contains the read-only scanner and lifecycle controller. `packages/ui` is a React factory supplied with each host's React, so React is not bundled into either plugin. Platform entry points adapt storage, discovery, settings access and navigation. Development dependencies are not runtime helper libraries.
+Use a small TypeScript repository, not package workspaces. `packages/core` contains pure models and algorithms. `packages/discord` contains the read-only scanner, lifecycle controller and guarded user-confirmed membership actions. `packages/ui` is a React factory supplied with each host's React, so React is not bundled into either plugin. Platform entry points adapt storage, discovery, settings access and navigation. Development dependencies are not runtime helper libraries.
 
 ## Scanner first and validation boundary
 
@@ -20,7 +20,7 @@ The minimal scanner was implemented and tested with synthetic store fixtures bef
 
 ## Store discovery
 
-BetterDiscord discovers named stores through `BdApi.Webpack.getStore` once per enable. Missing optional stores are recorded; required stores fail gracefully. Navigation functions are found once using `BdApi.Webpack.getModule` with export searching and source signatures matching the currently inspected Vencord router wrappers. This navigation discovery is optional and more fragile than scanning; no DOM selector injection is used. `getSettingsPanel` returns a React settings entry with **Open ServerVitals**. The dashboard uses `BdApi.ReactDOM.createPortal` to open a nearly full-window, scrollable dialog outside the narrow settings modal. Close or Escape dismisses it; focus returns to the previous control, and disabling the plugin removes the dialog and keyboard listener. `BdApi.Data.load/save` persist local account-scoped data. There are no patches.
+BetterDiscord discovers named stores through `BdApi.Webpack.getStore` once per enable. Missing optional stores are recorded; required stores fail gracefully. Navigation functions are found once using `BdApi.Webpack.getModule` with export searching and source signatures matching the currently inspected Vencord router wrappers. This navigation discovery is optional and more fragile than scanning; no DOM selector injection is used. `getSettingsPanel` returns a React settings entry with **Open ServerVitals**. The dashboard renders inside BetterDiscord’s settings modal focus boundary. A scoped, reversible style change on the containing `.bd-modal-root` expands it to 96vw by 90vh; styles are restored on close/unmount. This avoids the focus lock blocking inputs rendered in a separate body portal. `BdApi.Data.load/save` persist local account-scoped data. There are no patches.
 
 Vencord imports stores and React from `@webpack/common`. These bindings use Vencord's discovery mechanisms, not direct module-cache access. `definePlugin` provides start/stop; `definePluginSettings` exposes debug settings; `@api/DataStore` stores cache and dashboard preferences locally. `Modal`, `openModal` and `closeModal` from `@webpack/common` provide the dashboard, avoiding the now-deprecated legacy modal utilities. `NavigationRouter.transitionToGuild` and `ChannelRouter.transitionToChannel` provide existing navigation. No patches are needed.
 
@@ -102,6 +102,10 @@ Exports include all current servers, explicit accuracy/freshness/confidence, ISO
 
 One channel enumeration per guild; thread deduplication and newest selection are linear in loaded sources. Yield every 20 guilds to avoid a single long task. Scan only through the manual Check Now control. Enable/open restores cached results without scanning; legacy automatic-refresh preferences are ignored. Clearing the cache does not scan. Never scan during render. React memoizes derived views; rows are paged in groups of 50. At most two snapshots and 20 session duration samples remain in memory.
 
-No dispatcher message subscription is used: manual scans keep the evidence model simpler and avoid touching message payloads. UserStore's account-change listener is the only store subscription outside the UI controller. No patches, toolbar injection or fragile CSS selectors. Settings access is the reliable entry point.
+No dispatcher message subscription is used: manual scans keep the evidence model simpler and avoid touching message payloads. UserStore's account-change listener is the only store subscription outside the UI controller. No patches or toolbar injection. BetterDiscord sizing uses the containing host-owned .bd-modal-root class; if that class changes, resizing may fail while the dashboard remains inside the focus boundary. Settings access is the reliable entry point.
 
 Discord store names, method shapes, permissions, channel fields, thread maps, router signatures and modal internals may change without notice. A Vencord source build validates imports/types, not runtime module discovery. Synthetic tests cannot prove loaded metadata completeness or long-term client stability. Errors retain existing observations and show a restrained message, without logging exceptions or sensitive objects.
+
+## Explicit membership actions
+
+Both adapters discover the existing Discord module exposing `leaveGuild`. BetterDiscord uses Webpack export discovery; Vencord uses `findByPropsLazy`. No direct REST calls, tokens, or message bodies are used. The dashboard confirms the selected guild names before invoking Controller.leaveSelected. It validates account/generation, current guild membership, Keep and known ownership, deduplicates selections, invokes actions sequentially with 1.5 seconds between actions, saves successful removals, and stops at the first failure without retry. Disable/account changes prevent subsequent actions. Only scans are network-free; leaving causes Discord’s ordinary membership requests.

@@ -3,6 +3,65 @@ import assert from "node:assert/strict";
 import { Controller, type Storage } from "../packages/discord/src/controller";
 import { EPOCH } from "../packages/core/src/index";
 import type { Stores } from "../packages/discord/src/scanner";
+test("multi-server leaving stops at the first rejection and preserves remaining records", async () => {
+  const f = fixture(3);
+  await f.controller.start();
+  await f.controller.refresh();
+  const calls: string[] = [];
+  const result = await f.controller.leaveSelected(
+    ["1", "2", "3"],
+    async (id) => {
+      calls.push(id);
+      if (id === "2") throw new Error("Rate limit or permission failure");
+    },
+  );
+  assert.deepEqual(calls, ["1", "2"]);
+  assert.deepEqual(result.left, ["1"]);
+  assert.match(result.error!, /failure/);
+  assert.deepEqual(
+    f.controller.cache.current!.records.map((r) => r.guildId),
+    ["2", "3"],
+  );
+  f.controller.stop();
+});
+test("confirmed leaving protects Keep and owned servers without invoking actions", async () => {
+  const f = fixture();
+  await f.controller.start();
+  await f.controller.refresh();
+  let calls = 0;
+  const leave = async () => {
+    calls++;
+  };
+  await f.controller.toggleKeep("1");
+  assert.match((await f.controller.leaveSelected(["1"], leave)).error!, /Keep/);
+  await f.controller.toggleKeep("1");
+  f.stores.GuildStore!.getGuilds = () => ({
+    "1": { id: "1", name: "Owned", ownerId: "123" },
+  });
+  assert.match((await f.controller.leaveSelected(["1"], leave)).error!, /own/);
+  assert.equal(calls, 0);
+  f.controller.stop();
+});
+test("leaving removes successful records, deduplicates selections and does not retry failures", async () => {
+  const f = fixture();
+  await f.controller.start();
+  await f.controller.refresh();
+  let calls = 0;
+  const failed = await f.controller.leaveSelected(["1"], async () => {
+    calls++;
+    throw new Error("Discord rejected leaving");
+  });
+  assert.equal(calls, 1);
+  assert.deepEqual(failed.left, []);
+  assert.equal(f.controller.cache.current!.records.length, 1);
+  const result = await f.controller.leaveSelected(["1", "1"], async () => {
+    calls++;
+  });
+  assert.deepEqual(result.left, ["1"]);
+  assert.equal(calls, 2);
+  assert.equal(f.controller.cache.current!.records.length, 0);
+  f.controller.stop();
+});
 test("enable and reopen use cache without scanning or timers, including legacy refresh settings", async (t) => {
   t.mock.timers.enable({ apis: ["Date", "setInterval"], now: Date.now() });
   const f = fixture();

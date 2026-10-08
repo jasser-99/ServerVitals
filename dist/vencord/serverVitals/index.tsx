@@ -6,6 +6,7 @@
 import * as DataStore from "@api/DataStore";
 import { definePluginSettings } from "@api/Settings";
 import definePlugin, { OptionType } from "@utils/types";
+import { findByPropsLazy } from "@webpack";
 import {
   ActiveJoinedThreadsStore,
   ChannelRouter,
@@ -29,6 +30,9 @@ import { createDashboard } from "./shared/ui/src/dashboard";
 let controller: Controller | undefined;
 let Dashboard: ReturnType<typeof createDashboard> | undefined;
 let modalKey: string | undefined;
+const guildActions = findByPropsLazy("leaveGuild") as {
+  leaveGuild(id: string): Promise<void>;
+};
 const settings = definePluginSettings({
   debug: {
     type: OptionType.BOOLEAN,
@@ -42,7 +46,7 @@ const settings = definePluginSettings({
 export default definePlugin({
   name: "ServerVitals",
   description:
-    "Find the servers that have gone quiet. Independent alpha; initial implementation 100% AI generated. Version 0.1.0-alpha.2.",
+    "Find the servers that have gone quiet. Independent alpha; initial implementation 100% AI generated. Version 0.1.0-alpha.3.",
   authors: [{ name: "ServerVitals contributors", id: 0n }],
   settings,
   start() {
@@ -67,6 +71,9 @@ export default definePlugin({
       },
     );
     Dashboard = createDashboard(React, controller, {
+      leave: async (id) => {
+        await guildActions.leaveGuild(id);
+      },
       open(guildId, channelId) {
         try {
           if (!stores.GuildStore?.getGuilds()[guildId]) return false;
@@ -111,7 +118,7 @@ export default definePlugin({
     return (
       <div>
         <p>
-          Independent testing build · 0.1.0-alpha.2 · Initial implementation
+          Independent testing build · 0.1.0-alpha.3 · Initial implementation
           100% AI generated.
         </p>
         <button

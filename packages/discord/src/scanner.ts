@@ -19,6 +19,8 @@ export interface Guild {
   approximateMemberCount?: unknown;
   approximate_member_count?: unknown;
   unavailable?: boolean;
+  ownerId?: string;
+  owner_id?: string;
 }
 export interface Stores {
   GuildStore?: { getGuilds(): { [id: string]: Guild } };

@@ -5,12 +5,6 @@ import { createDashboard } from "../ui/src/dashboard";
 
 interface BdAPI {
   React: typeof ReactTypes;
-  ReactDOM: {
-    createPortal(
-      children: ReactTypes.ReactNode,
-      container: Element,
-    ): ReactTypes.ReactPortal;
-  };
   Webpack: {
     getStore(name: string): unknown;
     getModule(
@@ -44,6 +38,12 @@ class ServerVitals {
     const closeAllModals = findNavigation(".getState();for", " in ") as
       (() => void) | undefined;
     let stores: Stores = {};
+    const guildActions = BdApi.Webpack.getModule(
+      (value) =>
+        !!value &&
+        typeof (value as { leaveGuild?: unknown }).leaveGuild === "function",
+      { searchExports: true },
+    ) as { leaveGuild(id: string): Promise<void> } | undefined;
     this.controller = new Controller(
       () => {
         stores = Object.fromEntries(
@@ -63,6 +63,11 @@ class ServerVitals {
       },
     );
     this.Dashboard = createDashboard(BdApi.React, this.controller, {
+      leave: guildActions
+        ? async (id) => {
+            await guildActions.leaveGuild(id);
+          }
+        : undefined,
       open: (guildId, channelId) => {
         try {
           const guild = stores.GuildStore?.getGuilds()[guildId];
@@ -118,6 +123,7 @@ class ServerVitals {
     const controller = this.controller!;
     const Panel = () => {
       const [open, setOpen] = React.useState(false);
+      const container = React.useRef<HTMLDivElement>(null);
       React.useEffect(() => {
         const close = () => setOpen(false);
         this.closeDashboard = close;
@@ -130,43 +136,31 @@ class ServerVitals {
         controller.getRevision,
         controller.getRevision,
       );
-      const closeButton = React.useRef<HTMLButtonElement>(null);
-      React.useEffect(() => {
-        if (!open || !controller.enabled) return;
-        const previous = document.activeElement as HTMLElement | null;
-        closeButton.current?.focus();
-        const keydown = (event: KeyboardEvent) => {
-          if (event.key === "Escape") {
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            setOpen(false);
-          }
-          if (event.key === "Tab") {
-            const dialog = closeButton.current?.closest('[role="dialog"]');
-            const items = dialog?.querySelectorAll<HTMLElement>(
-              'button:not(:disabled), input, select, summary, [tabindex="0"]',
-            );
-            if (!items?.length) return;
-            const first = items[0],
-              last = items[items.length - 1];
-            if (event.shiftKey && document.activeElement === first) {
-              event.preventDefault();
-              last.focus();
-            } else if (!event.shiftKey && document.activeElement === last) {
-              event.preventDefault();
-              first.focus();
-            }
-          }
-        };
-        document.addEventListener("keydown", keydown, true);
+      React.useLayoutEffect(() => {
+        if (!open) return;
+        // Keep the dashboard inside BetterDiscord's actual FocusLock boundary.
+        const modal = container.current?.closest<HTMLElement>(".bd-modal-root");
+        if (!modal) return;
+        const properties = ["width", "max-width", "height", "max-height"];
+        const saved = properties.map((key) => [
+          key,
+          modal.style.getPropertyValue(key),
+          modal.style.getPropertyPriority(key),
+        ]);
+        modal.style.width = "96vw";
+        modal.style.maxWidth = "96vw";
+        modal.style.height = "90vh";
+        modal.style.maxHeight = "90vh";
         return () => {
-          document.removeEventListener("keydown", keydown, true);
-          previous?.focus();
+          for (const [key, value, priority] of saved) {
+            if (value) modal.style.setProperty(key, value, priority);
+            else modal.style.removeProperty(key);
+          }
         };
-      }, [open, controller.enabled]);
+      }, [open]);
       return React.createElement(
         "div",
-        null,
+        { ref: container },
         React.createElement(
           "button",
           {
@@ -177,62 +171,14 @@ class ServerVitals {
         ),
         open &&
           controller.enabled &&
-          BdApi.ReactDOM.createPortal(
-            React.createElement(
-              "div",
-              {
-                style: {
-                  position: "fixed",
-                  inset: 0,
-                  zIndex: 10000,
-                  background: "rgba(0,0,0,.75)",
-                  padding: "2vh 2vw",
-                  display: "flex",
-                },
-              },
-              React.createElement(
-                "div",
-                {
-                  role: "dialog",
-                  "aria-modal": true,
-                  "aria-label": "ServerVitals",
-                  style: {
-                    width: "100%",
-                    height: "100%",
-                    background: "var(--background-primary, #1c1e26)",
-                    borderRadius: 12,
-                    display: "flex",
-                    flexDirection: "column",
-                    overflow: "hidden",
-                  },
-                },
-                React.createElement(
-                  "div",
-                  {
-                    style: {
-                      padding: 12,
-                      display: "flex",
-                      justifyContent: "flex-end",
-                    },
-                  },
-                  React.createElement(
-                    "button",
-                    {
-                      ref: closeButton,
-                      onClick: () => setOpen(false),
-                      style: { padding: "8px 16px", cursor: "pointer" },
-                    },
-                    "Close ServerVitals (Esc)",
-                  ),
-                ),
-                React.createElement(
-                  "div",
-                  { style: { overflow: "auto", flex: 1, minHeight: 0 } },
-                  React.createElement(Dashboard),
-                ),
-              ),
-            ),
-            document.body,
+          React.createElement(
+            "div",
+            {
+              role: "region",
+              "aria-label": "ServerVitals",
+              style: { width: "100%" },
+            },
+            React.createElement(Dashboard),
           ),
       );
     };

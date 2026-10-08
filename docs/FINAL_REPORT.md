@@ -1,6 +1,6 @@
 # Initial development report
 
-**ServerVitals 0.1.0-alpha.2 — independent alpha testing build.** Initial implementation 100% AI generated with OpenAI Codex. Manual live-client testing has not been completed. This report does not mark any release stable.
+**ServerVitals 0.1.0-alpha.3 — independent alpha testing build.** Initial implementation 100% AI generated with OpenAI Codex. Manual live-client testing has not been completed. This report does not mark any release stable.
 
 ## Delivered integrations
 
@@ -26,12 +26,12 @@ Both include statistics, search, seven sort orders, combined filters, size colum
 
 GuildStore, ChannelStore, PermissionStore and UserStore are required. ReadStateStore, GuildMemberCountStore and ActiveJoinedThreadsStore are optional sources. BetterDiscord uses supported Webpack discovery; Vencord uses `@webpack/common` bindings. UserStore supplies only the current account ID for storage isolation and a change listener. No AuthenticationStore or MessageStore is used.
 
-Normal scanning issues **0 network/API requests**. Normal activity scanning never reads message contents. No authentication tokens, emails, DMs, telemetry or backend are accessed. Icon rendering can load Discord CDN images; explicit navigation can trigger Discord's ordinary loading. No automatic messages, joining, leaving or deletion is implemented.
+Normal scanning issues **0 network/API requests**. Normal activity scanning never reads message contents. No authentication tokens, emails, DMs, telemetry or backend are accessed. Icon rendering can load Discord CDN images; explicit navigation can trigger Discord's ordinary loading. No unsolicited membership changes, messages, joining or deletion is implemented. Explicitly confirmed leaving uses Discord’s existing client action, makes ordinary Discord requests, and stops on error without retrying.
 
 ## Validation results
 
 - Formatting, ESLint, strict shared/BetterDiscord TypeScript: passed.
-- 87 Node unit/integration tests: passed, including 200-guild/5,000-source synthetic coverage.
+- 90 Node unit/integration tests: passed, including 200-guild/5,000-source synthetic coverage.
 - Actual browser UI fixture checks: passed; zero page errors or external requests in that synthetic preview. Checked rendering, search, size sorting, Keep, filters, statistics, change drill-down, CSV download, diagnostics, settings and narrow layout.
 - BetterDiscord artifact build and mocked host smoke test: passed.
 - Vencord userplugin source-bundle validation, ZIP layout and SHA-256 verification: passed.

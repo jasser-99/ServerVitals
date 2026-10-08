@@ -2,7 +2,7 @@
 
 ServerVitals runs locally. It does not operate an external backend, collect analytics, send telemetry, or transmit server information to the developer. No external API or ServerVitals account is required.
 
-ServerVitals does not access, extract, display, store or transmit Discord authentication tokens. It does not use a token manually or create a self bot. It does not automate messages, joining, leaving, deleting or other account actions.
+ServerVitals does not access, extract, display, store or transmit Discord authentication tokens. It does not use a token manually or create a self bot. It does not automate messages, joining or deleting. Users may explicitly select servers and confirm leaving them through Discord’s existing client function. A confirmed batch runs sequentially with 1.5 seconds between actions, stops on the first failure, and does not retry. This membership action causes ordinary Discord network requests; activity scans remain local with zero API requests.
 
 Normal activity scanning uses only permitted, already loaded guild/channel metadata and message **IDs**. It does not need or read message contents. It does not inspect private messages, user emails or member profiles.
 

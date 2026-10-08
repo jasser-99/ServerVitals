@@ -1,6 +1,6 @@
 # Manual release checklist
 
-Version: **0.1.0-alpha.2**. All boxes below are intentionally unchecked. Automated checks do not satisfy this gate.
+Version: **0.1.0-alpha.3**. All boxes below are intentionally unchecked. Automated checks do not satisfy this gate.
 
 Record tester, date, OS, Discord build, BetterDiscord version, Vencord commit, result/evidence and any exceptions. Test each shared behavior in **both** integrations. Use normal permitted test guilds, empty/unknown sources, loaded forum posts and inaccessible channels. Never include tokens or message contents in evidence.
 
@@ -58,7 +58,9 @@ Record tester, date, OS, Discord build, BetterDiscord version, Vencord commit, r
 - [ ] No message contents are read, logged or stored.
 - [ ] No Discord authentication tokens are accessed.
 - [ ] No unexpected external network requests occur; scans make none, icons/navigation may use Discord normally.
-- [ ] No automated messages, joins, leaves or deletes occur.
+- [ ] No unsolicited membership changes, messages, joins or deletes occur.
+- [ ] Leave selection lists names, cancellation sends no action, Keep/owned servers are protected, successful leaves disappear, and batches stop on failure without retry.
+- [ ] Typing/search and sort-menu clicks work inside the real BetterDiscord focus boundary.
 - [ ] CPU and memory usage remain reasonable during repeated large scans.
 - [ ] Debug logging stays aggregate and console error spam is absent.
 - [ ] Discord remains stable during scan, disable, restart and account changes.

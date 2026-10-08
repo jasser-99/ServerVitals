@@ -15,6 +15,7 @@ import type { Controller } from "../../discord/src/controller";
 
 export interface Navigation {
   open(guildId: string, channelId?: string | null): boolean;
+  leave?(guildId: string): Promise<void>;
 }
 export function createDashboard(
   React: typeof ReactTypes,
@@ -74,6 +75,11 @@ export function createDashboard(
     const [page, setPage] = React.useState(0);
     const [tab, setTab] = React.useState("Servers");
     const [notice, setNotice] = React.useState("");
+    const [marked, setMarked] = React.useState<string[]>([]);
+    const [confirmLeave, setConfirmLeave] = React.useState<string[] | null>(
+      null,
+    );
+    const [leaving, setLeaving] = React.useState(false);
     const [thresholds, setThresholds] = React.useState(
       controller.settings.thresholds.join(", "),
     );
@@ -145,7 +151,7 @@ export function createDashboard(
               Last Full Scan: {snapshot ? date(snapshot.at) : "Not scanned"}
             </span>
             <button
-              disabled={!controller.enabled || controller.scanning}
+              disabled={!controller.enabled || controller.scanning || leaving}
               onClick={() => {
                 void controller.refresh();
               }}
@@ -156,8 +162,8 @@ export function createDashboard(
         </header>
         <p className="sv-info">
           Last Visible Activity reflects metadata visible to your account.
-          Missing private channels and unloaded threads limit coverage.
-          ServerVitals never leaves servers.
+          Missing private channels and unloaded threads limit coverage. Leaving
+          requires your explicit selection and confirmation.
         </p>
         {controller.error && (
           <p role="alert" className="sv-error">
@@ -210,21 +216,24 @@ export function createDashboard(
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </label>
-              <label>
-                Sort by
-                <select
-                  value={sort}
-                  onChange={(e) =>
-                    setSort(e.target.value as keyof typeof SORTS)
-                  }
-                >
+              <details className="sv-sort-menu">
+                <summary aria-label="Sort by">Sort by: {SORTS[sort]}</summary>
+                <div role="group" aria-label="Sort orders">
                   {Object.entries(SORTS).map(([key, label]) => (
-                    <option key={key} value={key}>
+                    <button
+                      key={key}
+                      aria-pressed={sort === key}
+                      onClick={(e) => {
+                        setSort(key as keyof typeof SORTS);
+                        const menu = e.currentTarget.closest("details");
+                        if (menu) menu.open = false;
+                      }}
+                    >
                       {label}
-                    </option>
+                    </button>
                   ))}
-                </select>
-              </label>
+                </div>
+              </details>
               <button onClick={() => download("csv")}>Export CSV (all)</button>
               <button onClick={() => download("json")}>
                 Export JSON (all)
@@ -238,7 +247,9 @@ export function createDashboard(
                   : "(All)"}
               </summary>
               <div>
-                {FILTERS.filter((f) => f !== "All").map((f) => (
+                {FILTERS.filter(
+                  (f) => f !== "All" && !f.startsWith("Freshness:"),
+                ).map((f) => (
                   <label key={f}>
                     <input
                       type="checkbox"
@@ -278,10 +289,87 @@ export function createDashboard(
                 ? "Keep servers hidden"
                 : "Keep servers included"}
             </p>
+            <div className="sv-controls">
+              <button
+                disabled={leaving}
+                onClick={() =>
+                  setMarked(
+                    selected.filter((r) => !r.keep).map((r) => r.guildId),
+                  )
+                }
+              >
+                Select matching servers
+              </button>
+              <button disabled={leaving} onClick={() => setMarked([])}>
+                Clear selection
+              </button>
+              <button
+                disabled={
+                  !navigation.leave ||
+                  !marked.length ||
+                  leaving ||
+                  controller.scanning
+                }
+                onClick={() => setConfirmLeave([...marked])}
+              >
+                Leave selected servers ({marked.length})
+              </button>
+            </div>
+            {confirmLeave && (
+              <section
+                className="sv-error"
+                aria-label="Confirm leaving servers"
+              >
+                <h2>Leave {confirmLeave.length} selected servers?</h2>
+                <p>
+                  This changes your Discord memberships. You may need a new
+                  invitation to rejoin. Keep servers and servers you own are
+                  protected. The batch stops at the first error.
+                </p>
+                <ul>
+                  {confirmLeave.map((id) => (
+                    <li key={id}>
+                      {records.find((r) => r.guildId === id)?.name ??
+                        "Unavailable server"}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  disabled={leaving}
+                  onClick={() => setConfirmLeave(null)}
+                >
+                  Cancel leaving
+                </button>{" "}
+                <button
+                  disabled={leaving || controller.scanning || !navigation.leave}
+                  onClick={async () => {
+                    if (!navigation.leave || leaving) return;
+                    setLeaving(true);
+                    const result = await controller.leaveSelected(
+                      confirmLeave,
+                      navigation.leave,
+                    );
+                    setMarked((current) =>
+                      current.filter((id) => !result.left.includes(id)),
+                    );
+                    setNotice(
+                      `Left ${result.left.length} server(s). ${result.error ?? "Selected memberships updated."}`,
+                    );
+                    setLeaving(false);
+                    setConfirmLeave(null);
+                  }}
+                >
+                  {leaving
+                    ? "Leaving selected servers…"
+                    : `Confirm leave ${confirmLeave.length} servers`}
+                </button>
+              </section>
+            )}
             <div className="sv-table-wrap">
               <table>
                 <thead>
                   <tr>
+                    <th>Select</th>
                     <th>Server</th>
                     {controller.settings.showSize && <th>Server Size</th>}
                     <th>Last Visible Activity</th>
@@ -291,6 +379,7 @@ export function createDashboard(
                     <th>Confidence</th>
                     <th>Channels</th>
                     <th>Keep</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -298,6 +387,21 @@ export function createDashboard(
                     .slice(currentPage * 50, (currentPage + 1) * 50)
                     .map((r) => (
                       <tr key={r.guildId}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${r.name} to leave`}
+                            disabled={r.keep || leaving}
+                            checked={marked.includes(r.guildId)}
+                            onChange={(e) =>
+                              setMarked(
+                                e.target.checked
+                                  ? [...marked, r.guildId]
+                                  : marked.filter((id) => id !== r.guildId),
+                              )
+                            }
+                          />
+                        </td>
                         <td>
                           <div className="sv-server">
                             {r.icon ? (
@@ -387,6 +491,19 @@ export function createDashboard(
                             }}
                           >
                             {r.keep ? "★ Keep" : "☆ Keep"}
+                          </button>
+                        </td>
+                        <td>
+                          <button
+                            disabled={
+                              r.keep ||
+                              leaving ||
+                              controller.scanning ||
+                              !navigation.leave
+                            }
+                            onClick={() => setConfirmLeave([r.guildId])}
+                          >
+                            Leave server
                           </button>
                         </td>
                       </tr>
@@ -605,7 +722,7 @@ export function createDashboard(
                 activity may then be unknown.
               </p>
               <button
-                disabled={controller.scanning}
+                disabled={controller.scanning || leaving}
                 onClick={() => {
                   void controller.resetCache();
                 }}
@@ -664,6 +781,7 @@ export function createDashboard(
   };
 }
 const CSS = `
+.sv-sort-menu summary{cursor:pointer;padding:8px 11px;border:1px solid #555d70;border-radius:6px}.sv-sort-menu>div{display:flex;flex-direction:column;gap:4px;padding-top:8px}.sv-sort-menu summary:focus-visible{outline:2px solid #9ab7ff}
 .sv-root{color:var(--text-normal,#eceef5);background:var(--background-primary,#1c1e26);font:14px/1.5 system-ui,sans-serif;padding:24px;border-radius:12px;box-sizing:border-box;min-width:0;max-width:100%}
-.sv-root *{box-sizing:border-box}.sv-root h1{font-size:32px;line-height:1.2;margin:8px 0}.sv-root h2{font-size:21px;margin:20px 0 12px}.sv-root p{margin:10px 0}.sv-root button,.sv-root select,.sv-root input:not([type=checkbox]){font:inherit;color:inherit;background:var(--background-secondary,#282c38);border:1px solid var(--background-modifier-accent,#555d70);border-radius:6px;padding:8px 11px}.sv-root button{cursor:pointer}.sv-root button:hover{border-color:#7f9fff}.sv-root button:focus-visible,.sv-root input:focus-visible,.sv-root select:focus-visible{outline:2px solid #9ab7ff;outline-offset:2px}.sv-root button:disabled{opacity:.5;cursor:default}.sv-root button[aria-pressed=true]{background:#354c75;border-color:#9ab7ff}.sv-header{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}.sv-eyebrow{font-size:11px;letter-spacing:1.4px;color:#a9bce4}.sv-scan{display:flex;flex-direction:column;align-items:flex-start;gap:6px}.sv-scan strong{font-size:22px}.sv-scan span,.sv-root small,.sv-root footer{color:var(--text-muted,#b3b7c7)}.sv-info{background:var(--background-secondary,#282c38);padding:12px;border-radius:6px}.sv-error{background:#522c36;padding:14px;border-radius:6px}.sv-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:20px 0}.sv-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:16px 0}.sv-stats>div{padding:14px;border:1px solid var(--background-modifier-accent,#41485b);border-radius:8px;background:var(--background-secondary,#242834)}.sv-stats strong{display:block;font-size:26px;color:#afc9ff}.sv-stats span{font-size:12px}.sv-controls{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:16px 0}.sv-controls label{display:flex;flex-direction:column;gap:5px}.sv-controls input{min-width:230px}.sv-filters{padding:10px;border:1px solid #48516a;border-radius:6px}.sv-filters>div{display:flex;flex-wrap:wrap;gap:12px;padding:12px 0}.sv-filters label,.sv-setting{display:flex;align-items:center;gap:8px}.sv-setting{margin:14px 0;flex-wrap:wrap}.sv-table-wrap{overflow:auto;max-height:58vh}.sv-root table{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap}.sv-root th{text-align:left;color:var(--text-muted,#c1c7d7);background:var(--background-secondary,#282c38);position:sticky;top:0;z-index:1}.sv-root th,.sv-root td{padding:12px 9px;border-bottom:1px solid var(--background-modifier-accent,#363e51)}.sv-root td:first-child{min-width:200px;max-width:320px;white-space:normal}.sv-server{display:flex;align-items:center;gap:9px}.sv-server img,.sv-icon{width:32px;height:32px;border-radius:9px;object-fit:cover;flex-shrink:0}.sv-icon{display:grid;place-items:center;background:#3d4c6d}.sv-root .sv-name{padding:0;border:0;background:transparent;text-align:left;white-space:normal}.sv-root .sv-link{font-size:11px;border:0;background:transparent;color:#abc7ff;padding:4px 0}.sv-root small{display:block;font-size:11px;white-space:normal}.sv-badge{display:inline-block;font-size:10px;letter-spacing:.6px;font-weight:700;padding:4px 6px;border:1px solid #758099;border-radius:4px}.sv-live{color:#b2f4d1}.sv-cached{color:#ebc385}.sv-partial{color:#c1b5ff}.sv-unknown{color:#c8cbd4}.sv-root dl{display:grid;grid-template-columns:minmax(160px,1fr) 1fr;gap:8px}.sv-root dd{margin:0}.sv-changes{list-style:none;padding:0}.sv-changes li{padding:10px 0}.sv-reset{margin:24px 0}.sv-empty{padding:30px;text-align:center}.sv-root footer{font-size:11px;margin-top:24px;padding-top:12px;border-top:1px solid #41485b}
+.sv-root *{box-sizing:border-box}.sv-root h1{font-size:32px;line-height:1.2;margin:8px 0}.sv-root h2{font-size:21px;margin:20px 0 12px}.sv-root p{margin:10px 0}.sv-root button,.sv-root select,.sv-root input:not([type=checkbox]){font:inherit;color:inherit;background:var(--background-secondary,#282c38);border:1px solid var(--background-modifier-accent,#555d70);border-radius:6px;padding:8px 11px}.sv-root button{cursor:pointer}.sv-root button:hover{border-color:#7f9fff}.sv-root button:focus-visible,.sv-root input:focus-visible,.sv-root select:focus-visible{outline:2px solid #9ab7ff;outline-offset:2px}.sv-root button:disabled{opacity:.5;cursor:default}.sv-root button[aria-pressed=true]{background:#354c75;border-color:#9ab7ff}.sv-header{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}.sv-eyebrow{font-size:11px;letter-spacing:1.4px;color:#a9bce4}.sv-scan{display:flex;flex-direction:column;align-items:flex-start;gap:6px}.sv-scan strong{font-size:22px}.sv-scan span,.sv-root small,.sv-root footer{color:var(--text-muted,#b3b7c7)}.sv-info{background:var(--background-secondary,#282c38);padding:12px;border-radius:6px}.sv-error{background:#522c36;padding:14px;border-radius:6px}.sv-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:20px 0}.sv-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:16px 0}.sv-stats>div{padding:14px;border:1px solid var(--background-modifier-accent,#41485b);border-radius:8px;background:var(--background-secondary,#242834)}.sv-stats strong{display:block;font-size:26px;color:#afc9ff}.sv-stats span{font-size:12px}.sv-controls{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:16px 0}.sv-controls label{display:flex;flex-direction:column;gap:5px}.sv-controls input{min-width:230px}.sv-filters{padding:10px;border:1px solid #48516a;border-radius:6px}.sv-filters>div{display:flex;flex-wrap:wrap;gap:12px;padding:12px 0}.sv-filters label,.sv-setting{display:flex;align-items:center;gap:8px}.sv-setting{margin:14px 0;flex-wrap:wrap}.sv-table-wrap{overflow:auto;max-height:58vh}.sv-root table{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap}.sv-root th{text-align:left;color:var(--text-muted,#c1c7d7);background:var(--background-secondary,#282c38);position:sticky;top:0;z-index:1}.sv-root th,.sv-root td{padding:12px 9px;border-bottom:1px solid var(--background-modifier-accent,#363e51)}.sv-root td:nth-child(2){min-width:200px;max-width:320px;white-space:normal}.sv-server{display:flex;align-items:center;gap:9px}.sv-server img,.sv-icon{width:32px;height:32px;border-radius:9px;object-fit:cover;flex-shrink:0}.sv-icon{display:grid;place-items:center;background:#3d4c6d}.sv-root .sv-name{padding:0;border:0;background:transparent;text-align:left;white-space:normal}.sv-root .sv-link{font-size:11px;border:0;background:transparent;color:#abc7ff;padding:4px 0}.sv-root small{display:block;font-size:11px;white-space:normal}.sv-badge{display:inline-block;font-size:10px;letter-spacing:.6px;font-weight:700;padding:4px 6px;border:1px solid #758099;border-radius:4px}.sv-live{color:#b2f4d1}.sv-cached{color:#ebc385}.sv-partial{color:#c1b5ff}.sv-unknown{color:#c8cbd4}.sv-root dl{display:grid;grid-template-columns:minmax(160px,1fr) 1fr;gap:8px}.sv-root dd{margin:0}.sv-changes{list-style:none;padding:0}.sv-changes li{padding:10px 0}.sv-reset{margin:24px 0}.sv-empty{padding:30px;text-align:center}.sv-root footer{font-size:11px;margin-top:24px;padding-top:12px;border-top:1px solid #41485b}
 `;

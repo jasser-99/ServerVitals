@@ -20,6 +20,14 @@ const closeAll = new Function(
   "return function(){const store={getState:()=>({settings:true})};const data=store.getState();for(const key in data){if(key)state.dismiss();}}",
 )(state);
 const data = new Map();
+const guilds: { [id: string]: { id: string; name: string } } = {
+  "1": { id: "1", name: "Test server" },
+};
+const guildActions = {
+  leaveGuild: async (id: string) => {
+    delete guilds[id];
+  },
+};
 const channel = {
   id: "100",
   guild_id: "1",
@@ -30,7 +38,7 @@ const channel = {
   ).toString(),
 };
 const stores: { [key: string]: unknown } = {
-  GuildStore: { getGuilds: () => ({ "1": { id: "1", name: "Test server" } }) },
+  GuildStore: { getGuilds: () => guilds },
   ChannelStore: {
     getChannel: (id: string) => (id === channel.id ? channel : undefined),
     getMutableGuildChannelsForGuild: () => ({ "100": channel }),
@@ -44,7 +52,7 @@ const api = {
   Webpack: {
     getStore: (name: string) => stores[name],
     getModule: (filter: (value: unknown) => boolean) =>
-      [toChannel, closeAll].find(filter),
+      [toChannel, closeAll, guildActions].find(filter),
   },
   Data: {
     load: (_plugin: string, key: string) => data.get(key),
@@ -65,6 +73,17 @@ await new Promise((resolve) => setTimeout(resolve, 10));
 root.render(
   <div data-testid="discord-settings">
     Discord Settings
-    <div data-testid="plugin-settings">{plugin.getSettingsPanel()}</div>
+    <div
+      data-testid="plugin-settings"
+      className="bd-modal-root"
+      style={{
+        width: 600,
+        height: 400,
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div style={{ overflow: "auto" }}>{plugin.getSettingsPanel()}</div>
+    </div>
   </div>,
 );

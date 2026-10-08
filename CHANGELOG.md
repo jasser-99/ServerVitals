@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0-alpha.3 — 2026-10-07
+
+Independent alpha; manual stability checklist pending.
+
+- Keep the enlarged BetterDiscord dashboard inside the host focus boundary so search and text inputs work. Restore modal dimensions on close.
+- Replace native sorting dropdown with an in-dashboard menu; remove freshness filters while retaining badges.
+- Add multi-selection and individual Leave controls with named confirmation, Keep/ownership protection, sequential actions, and stop-on-error behavior. No actual memberships are changed by automated tests.
+- Explain manual scanning, bounded current/previous snapshots, cache bytes and clearing in the README.
+
 ## 0.1.0-alpha.2 — 2026-10-07
 
 Independent alpha testing build; manual stability checklist pending.
