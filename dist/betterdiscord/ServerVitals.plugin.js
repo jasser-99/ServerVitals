@@ -1255,8 +1255,47 @@ var ServerVitals = class {
         "Enable ServerVitals to open the dashboard."
       );
     const Dashboard = this.Dashboard;
+    const controller = this.controller;
     function Panel() {
       const [open, setOpen] = React.useState(false);
+      React.useSyncExternalStore(
+        controller.subscribe,
+        controller.getRevision,
+        controller.getRevision
+      );
+      const closeButton = React.useRef(null);
+      React.useEffect(() => {
+        if (!open || !controller.enabled) return;
+        const previous = document.activeElement;
+        closeButton.current?.focus();
+        const keydown = (event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            setOpen(false);
+          }
+          if (event.key === "Tab") {
+            const dialog = closeButton.current?.closest('[role="dialog"]');
+            const items = dialog?.querySelectorAll(
+              'button:not(:disabled), input, select, summary, [tabindex="0"]'
+            );
+            if (!items?.length) return;
+            const first = items[0], last = items[items.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+              event.preventDefault();
+              last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+              event.preventDefault();
+              first.focus();
+            }
+          }
+        };
+        document.addEventListener("keydown", keydown, true);
+        return () => {
+          document.removeEventListener("keydown", keydown, true);
+          previous?.focus();
+        };
+      }, [open, controller.enabled]);
       return React.createElement(
         "div",
         null,
@@ -1268,7 +1307,63 @@ var ServerVitals = class {
           },
           open ? "Close ServerVitals" : "Open ServerVitals"
         ),
-        open && React.createElement(Dashboard)
+        open && controller.enabled && BdApi.ReactDOM.createPortal(
+          React.createElement(
+            "div",
+            {
+              style: {
+                position: "fixed",
+                inset: 0,
+                zIndex: 1e4,
+                background: "rgba(0,0,0,.75)",
+                padding: "2vh 2vw",
+                display: "flex"
+              }
+            },
+            React.createElement(
+              "div",
+              {
+                role: "dialog",
+                "aria-modal": true,
+                "aria-label": "ServerVitals",
+                style: {
+                  width: "100%",
+                  height: "100%",
+                  background: "var(--background-primary, #1c1e26)",
+                  borderRadius: 12,
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden"
+                }
+              },
+              React.createElement(
+                "div",
+                {
+                  style: {
+                    padding: 12,
+                    display: "flex",
+                    justifyContent: "flex-end"
+                  }
+                },
+                React.createElement(
+                  "button",
+                  {
+                    ref: closeButton,
+                    onClick: () => setOpen(false),
+                    style: { padding: "8px 16px", cursor: "pointer" }
+                  },
+                  "Close ServerVitals (Esc)"
+                )
+              ),
+              React.createElement(
+                "div",
+                { style: { overflow: "auto", flex: 1, minHeight: 0 } },
+                React.createElement(Dashboard)
+              )
+            )
+          ),
+          document.body
+        )
       );
     }
     return React.createElement(Panel);

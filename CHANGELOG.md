@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- BetterDiscord opens the dashboard in a nearly full-window, scrollable dialog, with Close and Escape controls, so statistics fit outside the small plugin settings modal.
+
 ## 0.1.0-alpha.1 — 2026-10-07
 
 Initial AI-generated independent testing build. Not stable; manual client checklist pending.
