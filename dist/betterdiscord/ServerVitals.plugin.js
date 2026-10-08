@@ -1,14 +1,16 @@
 /**
  * @name ServerVitals
- * @author ServerVitals contributors
- * @version 0.1.0-alpha.5
+ * @author jasser-99 / OpenAI Codex
+ * @authorLink https://github.com/jasser-99
+ * @source https://github.com/jasser-99/ServerVitals
+ * @version 0.1.0-alpha.6
  * @description Find the servers that have gone quiet. Independent alpha. Initial implementation 100% AI generated.
  * @license GPL-3.0-or-later
  */
 "use strict";
 
 // packages/core/src/index.ts
-var VERSION = "0.1.0-alpha.5";
+var VERSION = "0.1.0-alpha.6";
 var DAY = 864e5;
 var EPOCH = 14200704e5;
 var DEFAULT_SETTINGS = {

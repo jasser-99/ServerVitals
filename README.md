@@ -4,9 +4,11 @@
 
 ServerVitals shows the **Last Visible Activity** across your Discord servers, helping you identify active, quiet, inactive and dormant communities from one local dashboard. Separate implementations support **BetterDiscord** and a **Vencord custom userplugin**. No fixed server-count limit is imposed.
 
-> **Testing Build — 0.1.0-alpha.5**
+> **Testing Build — 0.1.0-alpha.6**
 >
 > This release has not completed the maintainer's manual stability checklist. Automated tests and source builds do not establish live Discord compatibility or stability. No stable release is published automatically.
+
+**Platform testing:** BetterDiscord has received maintainer testing and feedback, with known limitations documented below. Vencord is included for testing: its source and full build have automated validation, but it has **not been tested by a user in a live Vencord installation**.
 
 ## AI Development Disclosure
 
@@ -212,7 +214,7 @@ npm run check
 
 `packages/core` holds pure logic, `packages/discord` the scanner/controller, `packages/ui` the shared React view, and platform folders the adapters. `npm run build` produces the normal BetterDiscord plugin and a self-contained Vencord userplugin source folder. Runtime React comes from the host. Read [ARCHITECTURE.md](docs/ARCHITECTURE.md) for research, decisions and internal dependencies.
 
-Versions are synchronized at **0.1.0-alpha.5**. CI validates code/builds without publishing stable releases. Alpha publication is independent of upstream plugin directories.
+Versions are synchronized at **0.1.0-alpha.6**. CI validates code/builds without publishing stable releases. Alpha publication is independent of upstream plugin directories.
 
 ## Contributing
 

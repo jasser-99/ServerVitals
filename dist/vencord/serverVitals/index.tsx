@@ -47,7 +47,7 @@ const settings = definePluginSettings({
 export default definePlugin({
   name: "ServerVitals",
   description:
-    "Find the servers that have gone quiet. Independent alpha; initial implementation 100% AI generated. Version 0.1.0-alpha.5.",
+    "Find the servers that have gone quiet. Independent alpha; initial implementation 100% AI generated. Version 0.1.0-alpha.6.",
   authors: [{ name: "ServerVitals contributors", id: 0n }],
   settings,
   start() {
@@ -120,7 +120,7 @@ export default definePlugin({
     return (
       <div>
         <p>
-          Independent testing build · 0.1.0-alpha.5 · Initial implementation
+          Independent testing build · 0.1.0-alpha.6 · Initial implementation
           100% AI generated.
         </p>
         <button

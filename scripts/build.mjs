@@ -14,7 +14,7 @@ await build({
   legalComments: "inline",
   outfile: "dist/betterdiscord/ServerVitals.plugin.js",
   banner: {
-    js: `/**\n * @name ServerVitals\n * @author ServerVitals contributors\n * @version ${version}\n * @description Find the servers that have gone quiet. Independent alpha. Initial implementation 100% AI generated.\n * @license GPL-3.0-or-later\n */`,
+    js: `/**\n * @name ServerVitals\n * @author jasser-99 / OpenAI Codex\n * @authorLink https://github.com/jasser-99\n * @source https://github.com/jasser-99/ServerVitals\n * @version ${version}\n * @description Find the servers that have gone quiet. Independent alpha. Initial implementation 100% AI generated.\n * @license GPL-3.0-or-later\n */`,
   },
 });
 const root = "dist/vencord/serverVitals";

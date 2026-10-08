@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0-alpha.6 — 2026-10-07
+
+Testing build: BetterDiscord has received maintainer testing and feedback, but the full manual stability checklist remains incomplete. Vencord has automated build validation only; no live Vencord user testing has been completed.
+
+- Include BetterDiscord and Vencord userplugin downloads in the same prerelease.
+- Add BetterDiscord's Source link and linked `jasser-99 / OpenAI Codex` author credit. No support-server link is configured.
+- Include the alpha.5 dashboard, count diagnostics, documentation and screenshot updates.
+
 ## 0.1.0-alpha.5 — unreleased testing build
 
 - Add maintainer-supplied live BetterDiscord screenshots, redact two sensitive names/icons, and explain Unknown activity and independent cache fields.

@@ -11,7 +11,7 @@ import type {
   Snapshot,
 } from "./model";
 export type * from "./model";
-export const VERSION = "0.1.0-alpha.5";
+export const VERSION = "0.1.0-alpha.6";
 export const DAY = 86_400_000;
 export const EPOCH = 1420070400000;
 export const DEFAULT_SETTINGS: Settings = {

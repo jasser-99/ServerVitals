@@ -1,6 +1,6 @@
 # Initial development report
 
-**ServerVitals 0.1.0-alpha.5 — independent alpha testing build.** Initial implementation 100% AI generated with OpenAI Codex. Manual live-client testing has not been completed. This report does not mark any release stable.
+**ServerVitals 0.1.0-alpha.6 — independent alpha testing build.** Initial implementation 100% AI generated with OpenAI Codex. BetterDiscord has received maintainer testing and feedback; the full manual stability checklist remains incomplete. Vencord has not received live user testing. This report does not mark any release stable.
 
 ## Delivered integrations
 
@@ -9,7 +9,7 @@
 | BetterDiscord | Normal single-file plugin; settings → Open ServerVitals; named store discovery; BdApi Data persistence; shared dashboard/scanner; guarded Discord navigation; cleanup on stop | Bundle build and execution/start/stop/settings smoke test against mocked BdApi                                |
 | Vencord       | TypeScript/TSX custom userplugin; definePlugin lifecycle; Vencord settings, React/common stores, DataStore and current modal/router APIs; cleanup on stop                     | Full upstream TypeScript check and desktop build with generated userplugin installed in a validation checkout |
 
-Both include statistics, search, seven sort orders, combined filters, size column/labels, Keep, configurable categories, manual Check Now scanning, diagnostics, previous-scan changes and local CSV/JSON export. Neither live integration can be called verified from these automated results alone.
+Both include statistics, seven sort orders, combined filters, size column/labels, Keep, configurable categories, manual Check Now scanning, diagnostics, previous-scan changes and local CSV/JSON export. Search is temporarily removed following live BetterDiscord typing failures. Automated results alone do not establish live compatibility or stability.
 
 ## Measurements and reliability
 
