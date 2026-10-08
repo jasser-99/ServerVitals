@@ -497,7 +497,7 @@ test("JSON export contains fields and no message bodies", () => {
   assert.equal(result.servers[0]["Server Size Accuracy"], "exact");
   assert.equal("content" in result.servers[0], false);
 });
-test("settings migration whitelists and validates thresholds and intervals", () => {
+test("settings migration validates thresholds and discards legacy refresh intervals", () => {
   assert.deepEqual(migrateSettings(null), DEFAULT_SETTINGS);
   assert.deepEqual(
     migrateSettings({
@@ -513,6 +513,7 @@ test("settings migration whitelists and validates thresholds and intervals", () 
     [1, 2, 3, 4],
   );
   assert.equal(migrateSettings({ debug: "true" }).debug, false);
+  assert.equal("autoRefresh" in migrateSettings({ autoRefresh: 15 }), false);
 });
 test("cache restoration validates message IDs, whitelists fields and preserves baseline", () => {
   const extra = { ...record(), content: "not retained" };

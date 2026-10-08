@@ -1,12 +1,12 @@
 # Install for BetterDiscord
 
-**Testing build: 0.1.0-alpha.1.** The maintainer's manual stability checklist has not been completed. Initial implementation: 100% AI generated using OpenAI Codex. This is an independent, unofficial plugin.
+**Testing build: 0.1.0-alpha.2.** The maintainer's manual stability checklist has not been completed. Initial implementation: 100% AI generated using OpenAI Codex. This is an independent, unofficial plugin.
 
 1. Install BetterDiscord using its [official instructions](https://docs.betterdiscord.app/users/getting-started/installation).
 2. Download `dist/betterdiscord/ServerVitals.plugin.js` from this repository, or the identically named alpha release asset if available. Download the raw file, not the GitHub HTML page.
 3. In Discord, open User Settings → BetterDiscord → Plugins → **Open Plugins Folder**. This is the recommended way to find the actual folder for your installation.
 4. Copy `ServerVitals.plugin.js` into that folder, enable it, and open its settings.
-5. Click **Open ServerVitals**, then **Refresh Activity** if needed.
+5. Click **Open ServerVitals**, then **Check Now** if needed.
 
 Typical plugin paths documented by BetterDiscord:
 

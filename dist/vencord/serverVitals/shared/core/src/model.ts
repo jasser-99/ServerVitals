@@ -44,7 +44,6 @@ export interface Snapshot {
 export interface Settings {
   schemaVersion: 1;
   thresholds: [number, number, number, number];
-  autoRefresh: number;
   debug: boolean;
   hideKeep: boolean;
   showSize: boolean;

@@ -1,6 +1,6 @@
 # Manual release checklist
 
-Version: **0.1.0-alpha.1**. All boxes below are intentionally unchecked. Automated checks do not satisfy this gate.
+Version: **0.1.0-alpha.2**. All boxes below are intentionally unchecked. Automated checks do not satisfy this gate.
 
 Record tester, date, OS, Discord build, BetterDiscord version, Vencord commit, result/evidence and any exceptions. Test each shared behavior in **both** integrations. Use normal permitted test guilds, empty/unknown sources, loaded forum posts and inaccessible channels. Never include tokens or message contents in evidence.
 
@@ -45,10 +45,12 @@ Record tester, date, OS, Discord build, BetterDiscord version, Vencord commit, r
 - [ ] Unchanged servers create no false changes; restart alone creates no false freshness event.
 - [ ] Size-change thresholds avoid trivial/accuracy-type noise.
 - [ ] Clickable change groups select the expected current guilds; removed names remain readable.
-- [ ] Server/channel navigation works and respects current permissions.
+- [ ] Server/channel navigation respects permissions and closes ServerVitals and the underlying settings dialogs.
 - [ ] CSV/JSON export downloads locally; CSV escaping/formula neutralization works.
 - [ ] Category thresholds validate; fixed statistics retain their documented day bands.
-- [ ] Automatic refresh Off/5/15/30/60 and debug toggles work.
+- [ ] No automatic refresh controls/timers remain; enabling/opening restores cache without scanning.
+- [ ] Check Now updates Last Full Scan; Settings shows cache bytes, and clearing preserves Keep without rescanning.
+- [ ] Debug toggle works.
 - [ ] Keyboard focus, readability, scrolling and row pagination work with a large guild list.
 
 ## Privacy, performance and stability

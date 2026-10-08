@@ -93,6 +93,7 @@ const controller = new Controller(() => stores, {
   },
 });
 await controller.start();
+await controller.refresh();
 const Dashboard = createDashboard(React, controller, { open: () => true });
 createRoot(document.getElementById("app")!).render(
   <>

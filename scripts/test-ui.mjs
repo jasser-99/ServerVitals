@@ -1,7 +1,7 @@
 import { build } from "esbuild";
 import { chromium } from "playwright";
 import { createServer } from "node:http";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 const output = await build({
   entryPoints: ["scripts/preview.tsx"],
@@ -12,14 +12,44 @@ const output = await build({
   write: false,
 });
 const js = output.outputFiles[0].text;
+const bdPreview = await build({
+  entryPoints: ["scripts/preview-betterdiscord.tsx"],
+  bundle: true,
+  format: "esm",
+  platform: "browser",
+  target: "es2022",
+  write: false,
+});
+const pluginCode = await readFile(
+  "dist/betterdiscord/ServerVitals.plugin.js",
+  "utf8",
+);
 const html =
   '<!doctype html><html lang="en"><meta charset="utf-8"><title>ServerVitals synthetic preview</title><body style="margin:0;background:#1c1e26"><div id="app"></div><script type="module" src="/preview.js"></script></body></html>';
 const server = createServer((request, response) => {
+  if (
+    request.url === "/betterdiscord.js" ||
+    request.url === "/preview-betterdiscord.js"
+  ) {
+    response.setHeader("Content-Type", "text/javascript");
+    response.end(
+      request.url === "/betterdiscord.js"
+        ? pluginCode
+        : bdPreview.outputFiles[0].text,
+    );
+    return;
+  }
   response.setHeader(
     "Content-Type",
     request.url === "/preview.js" ? "text/javascript" : "text/html",
   );
-  response.end(request.url === "/preview.js" ? js : html);
+  response.end(
+    request.url === "/preview.js"
+      ? js
+      : request.url === "/betterdiscord"
+        ? html.replace("/preview.js", "/preview-betterdiscord.js")
+        : html,
+  );
 });
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const { port } = server.address();
@@ -94,6 +124,11 @@ try {
   await page.getByRole("button", { name: "Diagnostics", exact: true }).click();
   assert.match(await page.locator("dl").innerText(), /GuildStore\s+Found/);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  assert.equal(await page.getByLabel("Automatic refresh interval").count(), 0);
+  assert.match(
+    await page.locator(".sv-root").innerText(),
+    /Activity cache:.*bytes/,
+  );
   await page.getByLabel(/Hide Keep servers/).check();
   await page.getByRole("button", { name: "Servers", exact: true }).click();
   assert.equal(await page.locator("tbody tr").count(), 6);
@@ -102,6 +137,43 @@ try {
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
+  );
+  assert.deepEqual(errors, []);
+  assert.deepEqual(external, []);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByText("Reset activity cache", { exact: true }).click();
+  await page
+    .getByRole("button", { name: "Clear activity cache", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Servers", exact: true }).click();
+  assert.equal(await page.locator("tbody tr").count(), 0);
+  await page.getByRole("button", { name: "Check Now", exact: true }).click();
+  await page.locator("tbody tr").first().waitFor();
+  assert.equal(await page.locator("tbody tr").count(), 6);
+  await page.goto(`http://127.0.0.1:${port}/betterdiscord`);
+  await page
+    .getByRole("button", { name: "Open ServerVitals", exact: true })
+    .click();
+  assert.equal(await page.locator("tbody tr").count(), 0);
+  const dialog = await page
+    .getByRole("dialog", { name: "ServerVitals", exact: true })
+    .boundingBox();
+  assert.ok(dialog.width > 700 && dialog.height > 900);
+  await page.getByRole("button", { name: "Check Now", exact: true }).click();
+  await page.locator("tbody tr").first().waitFor();
+  await page
+    .getByRole("button", { name: "Open Last Active Channel", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "Opened channel 100", exact: true })
+    .waitFor();
+  assert.equal(await page.getByTestId("discord-settings").count(), 0);
+  assert.equal(await page.getByTestId("plugin-settings").count(), 0);
+  assert.equal(
+    await page
+      .getByRole("dialog", { name: "ServerVitals", exact: true })
+      .count(),
+    0,
   );
   assert.deepEqual(errors, []);
   assert.deepEqual(external, []);

@@ -11,6 +11,7 @@ import {
   ChannelRouter,
   ChannelStore,
   closeModal,
+  closeAllModals,
   GuildMemberCountStore,
   GuildStore,
   Modal,
@@ -29,20 +30,6 @@ let controller: Controller | undefined;
 let Dashboard: ReturnType<typeof createDashboard> | undefined;
 let modalKey: string | undefined;
 const settings = definePluginSettings({
-  autoRefresh: {
-    type: OptionType.SELECT,
-    description: "Automatic local metadata refresh",
-    options: [
-      { label: "Off", value: 0, default: true },
-      { label: "5 minutes", value: 5 },
-      { label: "15 minutes", value: 15 },
-      { label: "30 minutes", value: 30 },
-      { label: "60 minutes", value: 60 },
-    ],
-    onChange(value) {
-      void controller?.updateSettings({ autoRefresh: value });
-    },
-  },
   debug: {
     type: OptionType.BOOLEAN,
     description: "Debug Mode: log aggregate scan counts only",
@@ -55,7 +42,7 @@ const settings = definePluginSettings({
 export default definePlugin({
   name: "ServerVitals",
   description:
-    "Find the servers that have gone quiet. Independent alpha; initial implementation 100% AI generated. Version 0.1.0-alpha.1.",
+    "Find the servers that have gone quiet. Independent alpha; initial implementation 100% AI generated. Version 0.1.0-alpha.2.",
   authors: [{ name: "ServerVitals contributors", id: 0n }],
   settings,
   start() {
@@ -75,8 +62,6 @@ export default definePlugin({
         save: (key, value) => DataStore.set(`ServerVitals:${key}`, value),
       },
       (updated) => {
-        if (settings.store.autoRefresh !== updated.autoRefresh)
-          settings.store.autoRefresh = updated.autoRefresh;
         if (settings.store.debug !== updated.debug)
           settings.store.debug = updated.debug;
       },
@@ -100,6 +85,7 @@ export default definePlugin({
           }
           if (modalKey) closeModal(modalKey);
           modalKey = undefined;
+          closeAllModals();
           return true;
         } catch {
           return false;
@@ -110,7 +96,6 @@ export default definePlugin({
     void instance.start().then(() => {
       if (controller === instance && instance.enabled)
         void instance.updateSettings({
-          autoRefresh: settings.store.autoRefresh,
           debug: settings.store.debug,
         });
     });
@@ -126,7 +111,7 @@ export default definePlugin({
     return (
       <div>
         <p>
-          Independent testing build · 0.1.0-alpha.1 · Initial implementation
+          Independent testing build · 0.1.0-alpha.2 · Initial implementation
           100% AI generated.
         </p>
         <button

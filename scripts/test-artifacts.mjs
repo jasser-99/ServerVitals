@@ -56,6 +56,8 @@ assert.equal(typeof Plugin, "function");
 const plugin = new Plugin();
 plugin.start();
 await new Promise((resolve) => setTimeout(resolve, 10));
+assert.equal(data.has("cache:999"), false);
+await plugin.controller.refresh();
 assert.equal(data.get("cache:999").current.records.length, 1);
 assert.ok(React.isValidElement(plugin.getSettingsPanel()));
 assert.equal(storeNames.length, 7);

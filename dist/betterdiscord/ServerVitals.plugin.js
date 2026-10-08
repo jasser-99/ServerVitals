@@ -1,20 +1,19 @@
 /**
  * @name ServerVitals
  * @author ServerVitals contributors
- * @version 0.1.0-alpha.1
+ * @version 0.1.0-alpha.2
  * @description Find the servers that have gone quiet. Independent alpha. Initial implementation 100% AI generated.
  * @license GPL-3.0-or-later
  */
 "use strict";
 
 // packages/core/src/index.ts
-var VERSION = "0.1.0-alpha.1";
+var VERSION = "0.1.0-alpha.2";
 var DAY = 864e5;
 var EPOCH = 14200704e5;
 var DEFAULT_SETTINGS = {
   schemaVersion: 1,
   thresholds: [7, 30, 180, 365],
-  autoRefresh: 0,
   debug: false,
   hideKeep: false,
   showSize: true
@@ -128,7 +127,6 @@ function migrateSettings(raw) {
   return {
     schemaVersion: 1,
     thresholds: valid ? [...t] : [...DEFAULT_SETTINGS.thresholds],
-    autoRefresh: [0, 5, 15, 30, 60].includes(input.autoRefresh ?? -1) ? input.autoRefresh : 0,
     debug: input.debug === true,
     hideKeep: input.hideKeep === true,
     showSize: input.showSize !== false
@@ -642,7 +640,6 @@ var Controller = class {
   diagnostics = {};
   scanTimes = [];
   listeners = /* @__PURE__ */ new Set();
-  timer;
   generation = 0;
   account = "";
   writeQueue = Promise.resolve();
@@ -697,8 +694,6 @@ var Controller = class {
         };
       this.stores.UserStore?.addChangeListener?.(this.accountListener);
       this.emit();
-      this.schedule();
-      await this.refresh();
     } catch {
       if (this.enabled && this.generation === generation) {
         this.error = "ServerVitals could not initialize Discord stores or local storage. Re-enable after Discord finishes loading. Check diagnostics and the ServerVitals repository for updates.";
@@ -710,8 +705,6 @@ var Controller = class {
     this.enabled = false;
     this.generation++;
     this.scanning = false;
-    clearInterval(this.timer);
-    this.timer = void 0;
     this.stores.UserStore?.removeChangeListener?.(this.accountListener);
     this.stores = {};
     this.cache = emptyCache();
@@ -719,13 +712,6 @@ var Controller = class {
     this.baseline = null;
     this.emit();
     this.listeners.clear();
-  }
-  schedule() {
-    clearInterval(this.timer);
-    if (this.enabled && this.settings.autoRefresh > 0)
-      this.timer = setInterval(() => {
-        void this.refresh();
-      }, this.settings.autoRefresh * 6e4);
   }
   async save(kind) {
     const key = `${kind}:${this.account}`;
@@ -745,7 +731,6 @@ var Controller = class {
     if (!this.enabled || !this.account) return;
     this.settings = migrateSettings({ ...this.settings, ...partial });
     this.settingsChanged?.(this.settings);
-    this.schedule();
     this.emit();
     await this.save("settings");
   }
@@ -772,7 +757,6 @@ var Controller = class {
     this.baseline = null;
     this.emit();
     await this.save("cache");
-    await this.refresh();
   }
   async refresh() {
     if (!this.enabled || this.scanning) return;
@@ -950,7 +934,7 @@ function createDashboard(React, controller, navigation) {
           void controller.refresh();
         }
       },
-      controller.scanning ? "Inspecting metadata\u2026" : "Refresh Activity"
+      controller.scanning ? "Inspecting metadata\u2026" : "Check Now"
     ))), /* @__PURE__ */ React.createElement("p", { className: "sv-info" }, "Last Visible Activity reflects metadata visible to your account. Missing private channels and unloaded threads limit coverage. ServerVitals never leaves servers."), controller.error && /* @__PURE__ */ React.createElement("p", { role: "alert", className: "sv-error" }, controller.error), notice && /* @__PURE__ */ React.createElement("p", { role: "status" }, notice, " ", /* @__PURE__ */ React.createElement("button", { onClick: () => setNotice("") }, "Dismiss")), /* @__PURE__ */ React.createElement("nav", { className: "sv-tabs", "aria-label": "Dashboard sections" }, [
       "Servers",
       "Statistics",
@@ -1060,7 +1044,7 @@ function createDashboard(React, controller, navigation) {
         }
       },
       r.keep ? "\u2605 Keep" : "\u2606 Keep"
-    ))))))), !selected.length && /* @__PURE__ */ React.createElement("p", { className: "sv-empty" }, snapshot ? "No servers match this view." : "Refresh Activity to inspect currently loaded Discord metadata."), /* @__PURE__ */ React.createElement("div", { className: "sv-controls" }, /* @__PURE__ */ React.createElement(
+    ))))))), !selected.length && /* @__PURE__ */ React.createElement("p", { className: "sv-empty" }, snapshot ? "No servers match this view." : "Check Now to inspect currently loaded Discord metadata."), /* @__PURE__ */ React.createElement("div", { className: "sv-controls" }, /* @__PURE__ */ React.createElement(
       "button",
       {
         disabled: currentPage === 0,
@@ -1116,18 +1100,7 @@ function createDashboard(React, controller, navigation) {
           ([name, found]) => [name, found ? "Found" : "Unavailable"]
         )
       )
-    }).map(([key, value]) => /* @__PURE__ */ React.createElement(React.Fragment, { key }, /* @__PURE__ */ React.createElement("dt", null, key), /* @__PURE__ */ React.createElement("dd", null, value)))), /* @__PURE__ */ React.createElement("p", null, "Only loaded thread coverage is available in this alpha. Modules are discovered once per enable.")), tab === "Settings" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h2", null, "Settings"), /* @__PURE__ */ React.createElement("label", { className: "sv-setting" }, "Automatic refresh", /* @__PURE__ */ React.createElement(
-      "select",
-      {
-        value: controller.settings.autoRefresh,
-        onChange: (e) => {
-          void controller.updateSettings({
-            autoRefresh: Number(e.target.value)
-          });
-        }
-      },
-      [0, 5, 15, 30, 60].map((n) => /* @__PURE__ */ React.createElement("option", { key: n, value: n }, n ? `${n} minutes` : "Off"))
-    )), [
+    }).map(([key, value]) => /* @__PURE__ */ React.createElement(React.Fragment, { key }, /* @__PURE__ */ React.createElement("dt", null, key), /* @__PURE__ */ React.createElement("dd", null, value)))), /* @__PURE__ */ React.createElement("p", null, "Only loaded thread coverage is available in this alpha. Modules are discovered once per enable.")), tab === "Settings" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h2", null, "Settings"), /* @__PURE__ */ React.createElement("p", null, "Scans run only when you click Check Now. Opening ServerVitals shows saved results."), /* @__PURE__ */ React.createElement("p", null, "Activity cache:", " ", new TextEncoder().encode(JSON.stringify(controller.cache)).length.toLocaleString(), " ", "bytes (UTF-8 data). Includes at most the current and previous scan; repeated checks replace snapshots rather than append history. Storage containers may add overhead."), [
       ["debug", "Debug Mode (aggregate counts only)"],
       ["showSize", "Show Server Size column"],
       ["hideKeep", "Hide Keep servers from the server view"]
@@ -1168,7 +1141,7 @@ function createDashboard(React, controller, navigation) {
         }
       },
       "Save thresholds"
-    ), /* @__PURE__ */ React.createElement("details", { className: "sv-reset" }, /* @__PURE__ */ React.createElement("summary", null, "Reset activity cache"), /* @__PURE__ */ React.createElement("p", null, "This clears current and previous observations, preserves Keep, and scans again. Older activity may then be unknown."), /* @__PURE__ */ React.createElement(
+    ), /* @__PURE__ */ React.createElement("details", { className: "sv-reset" }, /* @__PURE__ */ React.createElement("summary", null, "Reset activity cache"), /* @__PURE__ */ React.createElement("p", null, "This clears current and previous observations, preserves Keep, and leaves the cache empty until you click Check Now. Older activity may then be unknown."), /* @__PURE__ */ React.createElement(
       "button",
       {
         disabled: controller.scanning,
@@ -1176,7 +1149,7 @@ function createDashboard(React, controller, navigation) {
           void controller.resetCache();
         }
       },
-      "Clear activity history and rescan"
+      "Clear activity cache"
     ))), tab === "Privacy" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h2", null, "Privacy & accuracy"), /* @__PURE__ */ React.createElement("p", null, "ServerVitals runs locally. It has no backend, analytics or telemetry. It does not access authentication tokens or read or cache message contents. Normal scanning sends zero network/API requests. Displaying server icons may load them from Discord\u2019s CDN."), /* @__PURE__ */ React.createElement("p", null, "Last Visible Activity is the newest trustworthy message Snowflake found in permitted, loaded channel metadata. Private channels and unloaded/archived threads are outside the observation. LIVE describes a local scan, not a fresh server response."), /* @__PURE__ */ React.createElement("h2", null, "AI Development Disclosure"), /* @__PURE__ */ React.createElement("p", null, "The initial ServerVitals codebase is 100% AI generated using OpenAI Codex. Future human contributions may change the codebase. Stable releases require the maintainer\u2019s manual installation, testing and evaluation."), /* @__PURE__ */ React.createElement("p", null, "This alpha has not completed that manual stability checklist."), /* @__PURE__ */ React.createElement("p", null, "ServerVitals is independent and unofficial, and is not affiliated with, endorsed by, sponsored by, or officially supported by Discord Inc., BetterDiscord, or Vencord. Client modifications may conflict with Discord\u2019s Terms or policies. Users install at their own discretion.")), /* @__PURE__ */ React.createElement("footer", null, "Independent \xB7 Unofficial \xB7 AI-generated initial implementation \xB7 Testing build"));
   }
   return function SafeDashboard() {
@@ -1192,13 +1165,18 @@ var CSS = `
 var ServerVitals = class {
   controller;
   Dashboard;
+  closeDashboard;
   start() {
-    const findNavigation = (signature) => BdApi.Webpack.getModule(
-      (value) => typeof value === "function" && Function.prototype.toString.call(value).includes(signature),
+    const findNavigation = (...signatures) => BdApi.Webpack.getModule(
+      (value) => typeof value === "function" && signatures.every(
+        (signature) => Function.prototype.toString.call(value).includes(signature)
+      ),
       { searchExports: true }
     );
     const toGuild = findNavigation("transitionToGuild -");
     const toChannel = findNavigation(".openTextInVoiceIfVoiceChannel");
+    const transitionTo = findNavigation("transitionTo - Transitioning to");
+    const closeAllModals = findNavigation(".getState();for", " in ");
     let stores = {};
     this.controller = new Controller(
       () => {
@@ -1219,7 +1197,7 @@ var ServerVitals = class {
       }
     );
     this.Dashboard = createDashboard(BdApi.React, this.controller, {
-      open(guildId, channelId) {
+      open: (guildId, channelId) => {
         try {
           const guild = stores.GuildStore?.getGuilds()[guildId];
           if (!guild) return false;
@@ -1227,11 +1205,18 @@ var ServerVitals = class {
             const channel = stores.ChannelStore?.getChannel(channelId);
             if (!channel || (channel.guild_id ?? channel.guildId) !== guildId || !stores.PermissionStore?.can(1024n, channel))
               return false;
-            if (!toChannel) return false;
-            toChannel(channelId);
+            if (toChannel) toChannel(channelId);
+            else if (transitionTo)
+              transitionTo(`/channels/${guildId}/${channelId}`);
+            else return false;
           } else {
             if (!toGuild) return false;
             toGuild(guildId);
+          }
+          this.closeDashboard?.();
+          try {
+            closeAllModals?.();
+          } catch {
           }
           return true;
         } catch {
@@ -1242,6 +1227,8 @@ var ServerVitals = class {
     void this.controller.start();
   }
   stop() {
+    this.closeDashboard?.();
+    this.closeDashboard = void 0;
     this.controller?.stop();
     this.controller = void 0;
     this.Dashboard = void 0;
@@ -1256,8 +1243,15 @@ var ServerVitals = class {
       );
     const Dashboard = this.Dashboard;
     const controller = this.controller;
-    function Panel() {
+    const Panel = () => {
       const [open, setOpen] = React.useState(false);
+      React.useEffect(() => {
+        const close = () => setOpen(false);
+        this.closeDashboard = close;
+        return () => {
+          if (this.closeDashboard === close) this.closeDashboard = void 0;
+        };
+      }, []);
       React.useSyncExternalStore(
         controller.subscribe,
         controller.getRevision,
@@ -1365,7 +1359,7 @@ var ServerVitals = class {
           document.body
         )
       );
-    }
+    };
     return React.createElement(Panel);
   }
 };

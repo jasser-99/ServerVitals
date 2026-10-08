@@ -150,9 +150,7 @@ export function createDashboard(
                 void controller.refresh();
               }}
             >
-              {controller.scanning
-                ? "Inspecting metadata…"
-                : "Refresh Activity"}
+              {controller.scanning ? "Inspecting metadata…" : "Check Now"}
             </button>
           </div>
         </header>
@@ -400,7 +398,7 @@ export function createDashboard(
               <p className="sv-empty">
                 {snapshot
                   ? "No servers match this view."
-                  : "Refresh Activity to inspect currently loaded Discord metadata."}
+                  : "Check Now to inspect currently loaded Discord metadata."}
               </p>
             )}
             <div className="sv-controls">
@@ -531,23 +529,19 @@ export function createDashboard(
         {tab === "Settings" && (
           <>
             <h2>Settings</h2>
-            <label className="sv-setting">
-              Automatic refresh
-              <select
-                value={controller.settings.autoRefresh}
-                onChange={(e) => {
-                  void controller.updateSettings({
-                    autoRefresh: Number(e.target.value),
-                  });
-                }}
-              >
-                {[0, 5, 15, 30, 60].map((n) => (
-                  <option key={n} value={n}>
-                    {n ? `${n} minutes` : "Off"}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <p>
+              Scans run only when you click Check Now. Opening ServerVitals
+              shows saved results.
+            </p>
+            <p>
+              Activity cache:{" "}
+              {new TextEncoder()
+                .encode(JSON.stringify(controller.cache))
+                .length.toLocaleString()}{" "}
+              bytes (UTF-8 data). Includes at most the current and previous
+              scan; repeated checks replace snapshots rather than append
+              history. Storage containers may add overhead.
+            </p>
             {(
               [
                 ["debug", "Debug Mode (aggregate counts only)"],
@@ -607,7 +601,8 @@ export function createDashboard(
               <summary>Reset activity cache</summary>
               <p>
                 This clears current and previous observations, preserves Keep,
-                and scans again. Older activity may then be unknown.
+                and leaves the cache empty until you click Check Now. Older
+                activity may then be unknown.
               </p>
               <button
                 disabled={controller.scanning}
@@ -615,7 +610,7 @@ export function createDashboard(
                   void controller.resetCache();
                 }}
               >
-                Clear activity history and rescan
+                Clear activity cache
               </button>
             </details>
           </>

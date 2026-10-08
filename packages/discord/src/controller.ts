@@ -22,7 +22,6 @@ export class Controller {
   diagnostics: { [name: string]: boolean } = {};
   scanTimes: number[] = [];
   private listeners = new Set<() => void>();
-  private timer: ReturnType<typeof setInterval> | undefined;
   private generation = 0;
   private account = "";
   private writeQueue: Promise<void> = Promise.resolve();
@@ -96,8 +95,6 @@ export class Controller {
         };
       this.stores.UserStore?.addChangeListener?.(this.accountListener);
       this.emit();
-      this.schedule();
-      await this.refresh();
     } catch {
       if (this.enabled && this.generation === generation) {
         this.error =
@@ -110,8 +107,6 @@ export class Controller {
     this.enabled = false;
     this.generation++;
     this.scanning = false;
-    clearInterval(this.timer);
-    this.timer = undefined;
     this.stores.UserStore?.removeChangeListener?.(this.accountListener);
     this.stores = {};
     this.cache = emptyCache();
@@ -119,13 +114,6 @@ export class Controller {
     this.baseline = null;
     this.emit();
     this.listeners.clear();
-  }
-  private schedule() {
-    clearInterval(this.timer);
-    if (this.enabled && this.settings.autoRefresh > 0)
-      this.timer = setInterval(() => {
-        void this.refresh();
-      }, this.settings.autoRefresh * 60_000);
   }
   private async save(kind: "cache" | "settings") {
     const key = `${kind}:${this.account}`;
@@ -147,7 +135,6 @@ export class Controller {
     if (!this.enabled || !this.account) return;
     this.settings = migrateSettings({ ...this.settings, ...partial });
     this.settingsChanged?.(this.settings);
-    this.schedule();
     this.emit();
     await this.save("settings");
   }
@@ -174,7 +161,6 @@ export class Controller {
     this.baseline = null;
     this.emit();
     await this.save("cache");
-    await this.refresh();
   }
   async refresh() {
     if (!this.enabled || this.scanning) return;

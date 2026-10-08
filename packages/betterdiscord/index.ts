@@ -27,16 +27,22 @@ declare const BdApi: BdAPI;
 class ServerVitals {
   private controller?: Controller;
   private Dashboard?: ReturnType<typeof createDashboard>;
+  private closeDashboard?: () => void;
   start() {
-    const findNavigation = (signature: string) =>
+    const findNavigation = (...signatures: string[]) =>
       BdApi.Webpack.getModule(
         (value) =>
           typeof value === "function" &&
-          Function.prototype.toString.call(value).includes(signature),
+          signatures.every((signature) =>
+            Function.prototype.toString.call(value).includes(signature),
+          ),
         { searchExports: true },
       ) as ((id: string) => void) | undefined;
     const toGuild = findNavigation("transitionToGuild -");
     const toChannel = findNavigation(".openTextInVoiceIfVoiceChannel");
+    const transitionTo = findNavigation("transitionTo - Transitioning to");
+    const closeAllModals = findNavigation(".getState();for", " in ") as
+      (() => void) | undefined;
     let stores: Stores = {};
     this.controller = new Controller(
       () => {
@@ -57,7 +63,7 @@ class ServerVitals {
       },
     );
     this.Dashboard = createDashboard(BdApi.React, this.controller, {
-      open(guildId, channelId) {
+      open: (guildId, channelId) => {
         try {
           const guild = stores.GuildStore?.getGuilds()[guildId];
           if (!guild) return false;
@@ -70,11 +76,20 @@ class ServerVitals {
               !stores.PermissionStore?.can(1024n, channel)
             )
               return false;
-            if (!toChannel) return false;
-            toChannel(channelId);
+            if (toChannel) toChannel(channelId);
+            else if (transitionTo)
+              transitionTo(`/channels/${guildId}/${channelId}`);
+            else return false;
           } else {
             if (!toGuild) return false;
             toGuild(guildId);
+          }
+          this.closeDashboard?.();
+          // Discord's settings overlay can otherwise hide a successful transition.
+          try {
+            closeAllModals?.();
+          } catch {
+            // Navigation succeeded; settings dismissal is optional.
           }
           return true;
         } catch {
@@ -85,6 +100,8 @@ class ServerVitals {
     void this.controller.start();
   }
   stop() {
+    this.closeDashboard?.();
+    this.closeDashboard = undefined;
     this.controller?.stop();
     this.controller = undefined;
     this.Dashboard = undefined;
@@ -99,8 +116,15 @@ class ServerVitals {
       );
     const Dashboard = this.Dashboard;
     const controller = this.controller!;
-    function Panel() {
+    const Panel = () => {
       const [open, setOpen] = React.useState(false);
+      React.useEffect(() => {
+        const close = () => setOpen(false);
+        this.closeDashboard = close;
+        return () => {
+          if (this.closeDashboard === close) this.closeDashboard = undefined;
+        };
+      }, []);
       React.useSyncExternalStore(
         controller.subscribe,
         controller.getRevision,
@@ -211,7 +235,7 @@ class ServerVitals {
             document.body,
           ),
       );
-    }
+    };
     return React.createElement(Panel);
   }
 }

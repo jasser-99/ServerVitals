@@ -3,6 +3,46 @@ import assert from "node:assert/strict";
 import { Controller, type Storage } from "../packages/discord/src/controller";
 import { EPOCH } from "../packages/core/src/index";
 import type { Stores } from "../packages/discord/src/scanner";
+test("enable and reopen use cache without scanning or timers, including legacy refresh settings", async (t) => {
+  t.mock.timers.enable({ apis: ["Date", "setInterval"], now: Date.now() });
+  const f = fixture();
+  f.data.set("settings:123", { autoRefresh: 5 });
+  await f.controller.start();
+  assert.equal(f.controller.cache.current, null);
+  assert.equal(f.data.has("cache:123"), false);
+  t.mock.timers.tick(3_600_000);
+  assert.equal(f.controller.cache.current, null);
+  await f.controller.refresh();
+  const at = f.controller.cache.current!.at;
+  f.controller.stop();
+  await f.controller.start();
+  assert.equal(f.controller.cache.current!.at, at);
+  assert.equal(f.controller.cache.current!.records[0].freshness, "CACHED");
+  t.mock.timers.tick(3_600_000);
+  assert.equal(f.controller.cache.current!.at, at);
+  f.controller.stop();
+});
+
+test("repeated manual checks retain only two snapshots", async () => {
+  const f = fixture();
+  await f.controller.start();
+  for (let i = 0; i < 20; i++) await f.controller.refresh();
+  const stored = f.data.get("cache:123") as {
+    current: unknown;
+    previous: unknown;
+  };
+  assert.ok(stored.current && stored.previous);
+  assert.deepEqual(Object.keys(stored).sort(), [
+    "current",
+    "keeps",
+    "previous",
+    "schemaVersion",
+  ]);
+  await f.controller.resetCache();
+  assert.equal(f.controller.cache.current, null);
+  assert.equal(f.controller.cache.previous, null);
+  f.controller.stop();
+});
 function fixture(count = 1) {
   const data = new Map<string, unknown>();
   let currentAccount = "123";
@@ -63,9 +103,10 @@ function fixture(count = 1) {
     hasListener: () => !!accountListener,
   };
 }
-test("controller scans on enable, Keep persists, snapshots rotate only on scans", async () => {
+test("manual scans preserve Keep and rotate snapshots only on checks", async () => {
   const f = fixture();
   await f.controller.start();
+  await f.controller.refresh();
   assert.equal(f.controller.cache.current?.records.length, 1);
   await f.controller.toggleKeep("1");
   assert.equal(f.controller.cache.previous === null, true);
@@ -81,10 +122,12 @@ test("controller scans on enable, Keep persists, snapshots rotate only on scans"
 test("monotonic caching survives restart without false freshness changes", async () => {
   const f = fixture();
   await f.controller.start();
+  await f.controller.refresh();
   const timestamp = f.controller.cache.current!.records[0].lastVisibleActivity;
   await f.controller.refresh();
   f.controller.stop();
   await f.controller.start();
+  await f.controller.refresh();
   assert.equal(
     f.controller.cache.current!.records[0].lastVisibleActivity,
     timestamp,
@@ -98,6 +141,7 @@ test("monotonic caching survives restart without false freshness changes", async
 test("missing metadata retains earlier activity and records current inspection", async () => {
   const f = fixture();
   await f.controller.start();
+  await f.controller.refresh();
   const old = f.controller.cache.current!.records[0].lastVisibleActivity;
   f.stores.ChannelStore!.getMutableGuildChannelsForGuild = () => ({});
   await f.controller.refresh();
@@ -108,6 +152,7 @@ test("missing metadata retains earlier activity and records current inspection",
 test("failed full scan preserves last successful snapshot", async () => {
   const f = fixture();
   await f.controller.start();
+  await f.controller.refresh();
   const prior = f.controller.cache.current;
   f.stores.GuildStore!.getGuilds = () => {
     throw new Error("changed");
@@ -119,7 +164,8 @@ test("failed full scan preserves last successful snapshot", async () => {
 });
 test("disable cancels yielding scan and prevents completion save", async () => {
   const f = fixture(200);
-  const task = f.controller.start();
+  await f.controller.start();
+  const task = f.controller.refresh();
   await new Promise((resolve) => setTimeout(resolve, 1));
   f.controller.stop();
   await task;
@@ -129,19 +175,26 @@ test("disable cancels yielding scan and prevents completion save", async () => {
 test("account switching clears visible cache and stops scanner", async () => {
   const f = fixture();
   await f.controller.start();
+  await f.controller.refresh();
   f.switchAccount();
   assert.equal(f.controller.enabled, false);
   assert.equal(f.controller.cache.current, null);
   assert.equal(f.hasListener(), false);
   await f.controller.start();
+  await f.controller.refresh();
   assert.ok(f.data.has("cache:456"));
   f.controller.stop();
 });
 test("cache reset preserves Keep and clears comparison baseline", async () => {
   const f = fixture();
   await f.controller.start();
+  await f.controller.refresh();
   await f.controller.toggleKeep("1");
   await f.controller.resetCache();
+  assert.equal(f.controller.cache.current, null);
+  assert.equal(f.controller.cache.previous, null);
+  assert.deepEqual(f.controller.cache.keeps, ["1"]);
+  await f.controller.refresh();
   assert.equal(f.controller.cache.current!.records[0].keep, true);
   assert.equal(f.controller.cache.previous, null);
   f.controller.stop();
@@ -152,22 +205,23 @@ test("storage failure is visible without crashing", async () => {
     throw new Error("disk full");
   };
   await f.controller.start();
+  await f.controller.refresh();
   assert.match(f.controller.error!, /storage could not be saved/);
   f.controller.stop();
 });
 test("settings changes validate and synchronize host callbacks", async () => {
   const f = fixture();
-  let interval = -1;
+  let debug = false;
   const controller = new Controller(
     () => f.stores,
     f.storage,
     (s) => {
-      interval = s.autoRefresh;
+      debug = s.debug;
     },
   );
   await controller.start();
-  await controller.updateSettings({ autoRefresh: 15 });
-  assert.equal(interval, 15);
+  await controller.updateSettings({ debug: true });
+  assert.equal(debug, true);
   assert.ok(f.data.has("settings:123"));
   controller.stop();
 });

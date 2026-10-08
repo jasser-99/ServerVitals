@@ -1,8 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.1.0-alpha.2 — 2026-10-07
 
-- BetterDiscord opens the dashboard in a nearly full-window, scrollable dialog, with Close and Escape controls, so statistics fit outside the small plugin settings modal.
+Independent alpha testing build; manual stability checklist pending.
+
+- BetterDiscord opens a nearly full-window scrollable dashboard.
+- Scans run only through Check Now. Opening/enabling restores cached results; automatic refresh has been removed, including legacy saved intervals.
+- Settings shows cache size in UTF-8 bytes and clears activity snapshots without rescanning, preserving Keep.
+- Channel navigation dismisses the dashboard and underlying Discord/BetterDiscord modals, with a Discord router fallback.
+- Regression coverage for manual scanning, bounded snapshots, cache clearing and cached reopening.
 
 ## 0.1.0-alpha.1 — 2026-10-07
 

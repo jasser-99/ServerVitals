@@ -1,6 +1,6 @@
 # Initial development report
 
-**ServerVitals 0.1.0-alpha.1 — independent alpha testing build.** Initial implementation 100% AI generated with OpenAI Codex. Manual live-client testing has not been completed. This report does not mark any release stable.
+**ServerVitals 0.1.0-alpha.2 — independent alpha testing build.** Initial implementation 100% AI generated with OpenAI Codex. Manual live-client testing has not been completed. This report does not mark any release stable.
 
 ## Delivered integrations
 
@@ -9,7 +9,7 @@
 | BetterDiscord | Normal single-file plugin; settings → Open ServerVitals; named store discovery; BdApi Data persistence; shared dashboard/scanner; guarded Discord navigation; cleanup on stop | Bundle build and execution/start/stop/settings smoke test against mocked BdApi                                |
 | Vencord       | TypeScript/TSX custom userplugin; definePlugin lifecycle; Vencord settings, React/common stores, DataStore and current modal/router APIs; cleanup on stop                     | Full upstream TypeScript check and desktop build with generated userplugin installed in a validation checkout |
 
-Both include statistics, search, seven sort orders, combined filters, size column/labels, Keep, configurable categories, manual/conservative automatic refresh, diagnostics, previous-scan changes and local CSV/JSON export. Neither live integration can be called verified from these automated results alone.
+Both include statistics, search, seven sort orders, combined filters, size column/labels, Keep, configurable categories, manual Check Now scanning, diagnostics, previous-scan changes and local CSV/JSON export. Neither live integration can be called verified from these automated results alone.
 
 ## Measurements and reliability
 
@@ -31,7 +31,7 @@ Normal scanning issues **0 network/API requests**. Normal activity scanning neve
 ## Validation results
 
 - Formatting, ESLint, strict shared/BetterDiscord TypeScript: passed.
-- 85 Node unit/integration tests: passed, including 200-guild/5,000-source synthetic coverage.
+- 87 Node unit/integration tests: passed, including 200-guild/5,000-source synthetic coverage.
 - Actual browser UI fixture checks: passed; zero page errors or external requests in that synthetic preview. Checked rendering, search, size sorting, Keep, filters, statistics, change drill-down, CSV download, diagnostics, settings and narrow layout.
 - BetterDiscord artifact build and mocked host smoke test: passed.
 - Vencord userplugin source-bundle validation, ZIP layout and SHA-256 verification: passed.
@@ -51,7 +51,7 @@ The synthetic screenshot is labeled and is not a live-client screenshot. Synthet
 
 ## Repository and publication status
 
-Source published on 2026-10-07 to the public repository [jasser-99/ServerVitals](https://github.com/jasser-99/ServerVitals), branch `main`. GitHub topics and description are configured. The maintainer account's GitHub noreply address is used for the repository-local commit identity.
+Source published on 2026-10-07 to the currently private repository [jasser-99/ServerVitals](https://github.com/jasser-99/ServerVitals), branch `main`. GitHub topics and description are configured. The maintainer account's GitHub noreply address is used for the repository-local commit identity.
 
 The initial source and distributable artifacts are available in the repository. Releases before manual testing must be explicitly marked **prerelease** and include the Testing Build warning. CI does not publish releases. Nothing was submitted to BetterDiscord or Vencord. Do not distribute the validation checkout's Vencord build.
 
@@ -61,4 +61,4 @@ Complete [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) in both clients. Start wit
 
 Accuracy is limited to permitted loaded metadata; private channels and unloaded/archived threads are not represented. Empty and uninitialized sources can be indistinguishable. Forum parents do not prove newest reply activity. Local member counts can be stale. Discord internal stores, field names, permission methods and navigation/modal signatures may change, even when source compilation passes.
 
-There are no known failing automated checks preventing an explicitly labeled source alpha. **Live client validation remains outstanding and prevents a verified compatibility/stability claim. The source is now publicly available on GitHub.**
+There are no known failing automated checks preventing an explicitly labeled source alpha. **Live client validation remains outstanding and prevents a verified compatibility/stability claim. The source is available in the private GitHub repository.**

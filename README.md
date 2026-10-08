@@ -4,7 +4,7 @@
 
 ServerVitals shows the **Last Visible Activity** across your Discord servers, helping you identify active, quiet, inactive and dormant communities from one local dashboard. Separate implementations support **BetterDiscord** and a **Vencord custom userplugin**. No fixed server-count limit is imposed.
 
-> **Testing Build — 0.1.0-alpha.1**
+> **Testing Build — 0.1.0-alpha.2**
 >
 > This release has not completed the maintainer's manual stability checklist. Automated tests and source builds do not establish live Discord compatibility or stability. No stable release is published automatically.
 
@@ -38,7 +38,7 @@ This preview uses **synthetic demonstration data**, not a live Discord scan. Liv
 - Local Keep metadata and optional hiding from the server view, without changing activity or overall statistics.
 - Monotonic activity cache, separate inspection time, coverage-derived confidence and two-scan comparison.
 - Loaded thread/forum reply support, conservative unknown handling, diagnostic counts and measured scan duration.
-- Local CSV/JSON exports. Optional refresh at 5/15/30/60 minutes, default **Off**.
+- Local CSV/JSON exports. Manual **Check Now** scans only; opening the dashboard loads cached results. Cache size and clearing are available in Settings.
 - Settings access in both hosts; no DOM selectors, required helper plugin or ServerVitals backend.
 
 ## Statistics Dashboard
@@ -162,7 +162,7 @@ npm run check
 
 `packages/core` holds pure logic, `packages/discord` the scanner/controller, `packages/ui` the shared React view, and platform folders the adapters. `npm run build` produces the normal BetterDiscord plugin and a self-contained Vencord userplugin source folder. Runtime React comes from the host. Read [ARCHITECTURE.md](docs/ARCHITECTURE.md) for research, decisions and internal dependencies.
 
-Versions are synchronized at **0.1.0-alpha.1**. CI validates code/builds without publishing stable releases. Alpha publication is independent of upstream plugin directories.
+Versions are synchronized at **0.1.0-alpha.2**. CI validates code/builds without publishing stable releases. Alpha publication is independent of upstream plugin directories.
 
 ## Contributing
 

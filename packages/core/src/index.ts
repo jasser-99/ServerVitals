@@ -11,13 +11,12 @@ import type {
   Snapshot,
 } from "./model";
 export type * from "./model";
-export const VERSION = "0.1.0-alpha.1";
+export const VERSION = "0.1.0-alpha.2";
 export const DAY = 86_400_000;
 export const EPOCH = 1420070400000;
 export const DEFAULT_SETTINGS: Settings = {
   schemaVersion: 1,
   thresholds: [7, 30, 180, 365],
-  autoRefresh: 0,
   debug: false,
   hideKeep: false,
   showSize: true,
@@ -206,9 +205,6 @@ export function migrateSettings(raw: unknown): Settings {
     thresholds: valid
       ? ([...t] as Settings["thresholds"])
       : [...DEFAULT_SETTINGS.thresholds],
-    autoRefresh: [0, 5, 15, 30, 60].includes(input.autoRefresh ?? -1)
-      ? input.autoRefresh!
-      : 0,
     debug: input.debug === true,
     hideKeep: input.hideKeep === true,
     showSize: input.showSize !== false,
