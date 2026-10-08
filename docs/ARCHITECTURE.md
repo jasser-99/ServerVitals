@@ -1,6 +1,6 @@
 # ServerVitals architecture
 
-Version: **0.1.0-alpha.6**. Documentation and source researched on 2026-10-07.
+Version: **0.1.6**. Documentation and source researched on 2026-10-07.
 
 ## Research and decisions
 

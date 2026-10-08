@@ -1,6 +1,6 @@
 # Manual release checklist
 
-Version: **0.1.0-alpha.6**. All boxes below are intentionally unchecked. Automated checks do not satisfy this gate.
+Version: **0.1.6**. All boxes below are intentionally unchecked. Automated checks do not satisfy this gate.
 
 Record tester, date, OS, Discord build, BetterDiscord version, Vencord commit, result/evidence and any exceptions. Test each shared behavior in **both** integrations. Use normal permitted test guilds, empty/unknown sources, loaded forum posts and inaccessible channels. Never include tokens or message contents in evidence.
 

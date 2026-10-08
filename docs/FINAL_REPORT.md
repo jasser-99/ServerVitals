@@ -1,6 +1,6 @@
 # Initial development report
 
-**ServerVitals 0.1.0-alpha.6 — independent alpha testing build.** Initial implementation 100% AI generated with OpenAI Codex. BetterDiscord has received maintainer testing and feedback; the full manual stability checklist remains incomplete. Vencord has not received live user testing. This report does not mark any release stable.
+**ServerVitals 0.1.6 — independent alpha testing build.** Initial implementation 100% AI generated with OpenAI Codex. BetterDiscord has received maintainer testing and feedback; the full manual stability checklist remains incomplete. Vencord has not received live user testing. This report does not mark any release stable.
 
 ## Delivered integrations
 
