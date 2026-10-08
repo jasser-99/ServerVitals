@@ -1,6 +1,6 @@
 # Initial development report
 
-**ServerVitals 0.1.0-alpha.4 — independent alpha testing build.** Initial implementation 100% AI generated with OpenAI Codex. Manual live-client testing has not been completed. This report does not mark any release stable.
+**ServerVitals 0.1.0-alpha.5 — independent alpha testing build.** Initial implementation 100% AI generated with OpenAI Codex. Manual live-client testing has not been completed. This report does not mark any release stable.
 
 ## Delivered integrations
 
@@ -31,13 +31,13 @@ Normal scanning issues **0 network/API requests**. Normal activity scanning neve
 ## Validation results
 
 - Formatting, ESLint, strict shared/BetterDiscord TypeScript: passed.
-- 90 Node unit/integration tests: passed, including 200-guild/5,000-source synthetic coverage.
+- 92 Node unit/integration tests: passed, including 200-guild/5,000-source synthetic coverage.
 - Actual browser UI fixture checks: passed; zero page errors or external requests in that synthetic preview. Checked rendering, search, size sorting, Keep, filters, statistics, change drill-down, CSV download, diagnostics, settings and narrow layout.
 - BetterDiscord artifact build and mocked host smoke test: passed.
 - Vencord userplugin source-bundle validation, ZIP layout and SHA-256 verification: passed.
 - Full Vencord TypeScript and desktop build: passed against commit `718c867256a9d181edc7a534afb296b9bb41ab58`.
 - Dependency audit at implementation time: no reported vulnerabilities.
-- Live BetterDiscord/Vencord installation, real store discovery, actual guild counts, runtime CPU/memory and long-term stability: **not tested**.
+- Maintainer-supplied live BetterDiscord screenshots show rows, activity sorting and Unknown examples. Text input remains problematic (search temporarily removed), and the 199-versus-200 count needs comparison of new Diagnostics fields. Full manual stability testing, Vencord runtime behavior and CPU/memory validation remain incomplete.
 
 The synthetic screenshot is labeled and is not a live-client screenshot. Synthetic timing output is not a real Discord performance claim. The validation checkout is ignored by Git and is not distributed.
 

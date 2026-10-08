@@ -22,6 +22,7 @@ import {
   React,
   ReadStateStore,
   UserStore,
+  UserGuildJoinRequestStore,
 } from "@webpack/common";
 import { Controller } from "../discord/src/controller";
 import type { Channel, Stores } from "../discord/src/scanner";
@@ -46,7 +47,7 @@ const settings = definePluginSettings({
 export default definePlugin({
   name: "ServerVitals",
   description:
-    "Find the servers that have gone quiet. Independent alpha; initial implementation 100% AI generated. Version 0.1.0-alpha.4.",
+    "Find the servers that have gone quiet. Independent alpha; initial implementation 100% AI generated. Version 0.1.0-alpha.5.",
   authors: [{ name: "ServerVitals contributors", id: 0n }],
   settings,
   start() {
@@ -58,6 +59,7 @@ export default definePlugin({
       GuildMemberCountStore,
       ActiveJoinedThreadsStore,
       UserStore,
+      UserGuildJoinRequestStore,
     } as unknown as Stores;
     controller = new Controller(
       () => stores,
@@ -118,7 +120,7 @@ export default definePlugin({
     return (
       <div>
         <p>
-          Independent testing build · 0.1.0-alpha.4 · Initial implementation
+          Independent testing build · 0.1.0-alpha.5 · Initial implementation
           100% AI generated.
         </p>
         <button

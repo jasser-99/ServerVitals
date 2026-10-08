@@ -63,35 +63,11 @@ export function createDashboard(
     }
   }
   function Dashboard() {
-    const dashboardRoot = React.useRef<HTMLElement>(null);
-    React.useEffect(() => {
-      const isolateTextKey = (event: KeyboardEvent) => {
-        const target = event.target;
-        if (
-          !(target instanceof HTMLInputElement) ||
-          !dashboardRoot.current?.contains(target) ||
-          target.type === "checkbox" ||
-          event.key === "Tab" ||
-          event.key === "Escape"
-        )
-          return;
-        // Preserve browser editing defaults, but keep host keybind handlers from
-        // redirecting focus or consuming keys in our plain HTML text fields.
-        event.stopImmediatePropagation();
-      };
-      window.addEventListener("keydown", isolateTextKey, true);
-      window.addEventListener("keyup", isolateTextKey, true);
-      return () => {
-        window.removeEventListener("keydown", isolateTextKey, true);
-        window.removeEventListener("keyup", isolateTextKey, true);
-      };
-    }, []);
     const revision = React.useSyncExternalStore(
       controller.subscribe,
       controller.getRevision,
       controller.getRevision,
     );
-    const [search, setSearch] = React.useState("");
     const [sort, setSort] = React.useState<keyof typeof SORTS>("oldest");
     const [filters, setFilters] = React.useState<string[]>([]);
     const [ids, setIds] = React.useState<string[] | undefined>();
@@ -125,7 +101,7 @@ export function createDashboard(
         selectRecords(
           records,
           {
-            search,
+            search: "",
             sort,
             filters,
             hideKeep: controller.settings.hideKeep,
@@ -133,7 +109,7 @@ export function createDashboard(
           },
           now,
         ),
-      [records, search, sort, filters, ids, now, controller.settings.hideKeep],
+      [records, sort, filters, ids, now, controller.settings.hideKeep],
     );
     const stats = React.useMemo(() => statistics(records, now), [records, now]);
     const changes = React.useMemo(
@@ -148,7 +124,7 @@ export function createDashboard(
     }, [changes]);
     React.useEffect(() => {
       setPage(0);
-    }, [search, sort, filters, ids, controller.settings.hideKeep]);
+    }, [sort, filters, ids, controller.settings.hideKeep]);
     const pages = Math.max(1, Math.ceil(selected.length / 50));
     const currentPage = Math.min(page, pages - 1);
     const date = (value: number | null) =>
@@ -158,11 +134,7 @@ export function createDashboard(
         setNotice("Discord navigation is unavailable in this client version.");
     };
     return (
-      <section
-        ref={dashboardRoot}
-        className="sv-root"
-        aria-label="ServerVitals dashboard"
-      >
+      <section className="sv-root" aria-label="ServerVitals dashboard">
         <style>{CSS}</style>
         <header className="sv-header">
           <div>
@@ -173,7 +145,23 @@ export function createDashboard(
             <p>Find the servers that have gone quiet.</p>
           </div>
           <div className="sv-scan">
-            <strong>{records.length} Servers</strong>
+            <strong>
+              {controller.guildCounts.reported ??
+                controller.guildCounts.loaded ??
+                "Unknown"}{" "}
+              joined servers
+            </strong>
+            <small>
+              {records.length} servers in saved scan ·{" "}
+              {controller.guildCounts.loaded ?? "Unknown"} loaded guild records
+            </small>
+            {controller.guildCounts.requests !== null &&
+              controller.guildCounts.requests > 0 && (
+                <small>
+                  {controller.guildCounts.requests} additional join-request
+                  entries (not activity-scanned memberships)
+                </small>
+              )}
             <span>
               Last Full Scan: {snapshot ? date(snapshot.at) : "Not scanned"}
             </span>
@@ -229,22 +217,13 @@ export function createDashboard(
               ].map((key) => (
                 <div key={key}>
                   <strong>{stats[key as keyof typeof stats]}</strong>
-                  <span>{key}</span>
+                  <span>
+                    {key === "Total Servers" ? "Servers in Scan" : key}
+                  </span>
                 </div>
               ))}
             </div>
             <div className="sv-controls">
-              <label>
-                Search servers
-                <input
-                  type="search"
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                  placeholder="Search server names…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </label>
               <details className="sv-sort-menu">
                 <summary aria-label="Sort by">Sort by: {SORTS[sort]}</summary>
                 <div role="group" aria-label="Sort orders">
@@ -578,7 +557,9 @@ export function createDashboard(
               {Object.entries(stats).map(([name, value]) => (
                 <div key={name}>
                   <strong>{value ?? "—"}</strong>
-                  <span>{name}</span>
+                  <span>
+                    {name === "Total Servers" ? "Servers in Scan" : name}
+                  </span>
                 </div>
               ))}
             </div>
@@ -603,7 +584,6 @@ export function createDashboard(
                     onClick={() => {
                       setIds([...new Set(events.map((e) => e.guildId))]);
                       setFilters([]);
-                      setSearch("");
                       setTab("Servers");
                     }}
                   >
@@ -627,7 +607,13 @@ export function createDashboard(
             <h2>Local diagnostics</h2>
             <dl>
               {Object.entries({
-                "Guilds discovered": records.length,
+                "Joined guild count (client)":
+                  controller.guildCounts.reported ?? "Unavailable",
+                "Loaded guild records (client)":
+                  controller.guildCounts.loaded ?? "Unavailable",
+                "Additional join-request entries":
+                  controller.guildCounts.requests ?? "Unavailable / not loaded",
+                "Guilds discovered in saved scan": records.length,
                 "Guilds scanned": records.length,
                 "Visible channels scanned": stats["Visible Channels Scanned"],
                 "Thread sources scanned": records.reduce(
@@ -710,8 +696,6 @@ export function createDashboard(
               Category thresholds in days (four increasing numbers)
               <input
                 value={thresholds}
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
                 onChange={(e) => setThresholds(e.target.value)}
               />
             </label>

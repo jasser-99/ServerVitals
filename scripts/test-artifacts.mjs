@@ -60,7 +60,7 @@ assert.equal(data.has("cache:999"), false);
 await plugin.controller.refresh();
 assert.equal(data.get("cache:999").current.records.length, 1);
 assert.ok(React.isValidElement(plugin.getSettingsPanel()));
-assert.equal(storeNames.length, 7);
+assert.equal(storeNames.length, 8);
 plugin.stop();
 assert.equal(plugin.controller, undefined);
 assert.ok(React.isValidElement(plugin.getSettingsPanel()));

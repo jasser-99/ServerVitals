@@ -3,6 +3,55 @@ import assert from "node:assert/strict";
 import { Controller, type Storage } from "../packages/discord/src/controller";
 import { EPOCH } from "../packages/core/src/index";
 import type { Stores } from "../packages/discord/src/scanner";
+test("joined counts, loaded records, and join-request entries remain separate", async () => {
+  const f = fixture(199);
+  f.stores.GuildStore!.getGuildCount = () => 199;
+  f.stores.UserGuildJoinRequestStore = {
+    hasFetchedRequestToJoinGuilds: true,
+    computeGuildIds: () => ["199", "200", "200", "invalid"],
+  };
+  await f.controller.start();
+  assert.deepEqual(f.controller.guildCounts, {
+    loaded: 199,
+    reported: 199,
+    requests: 1,
+  });
+  assert.equal(f.controller.cache.current, null);
+  f.stores.GuildStore!.getGuildCount = () => 200;
+  await f.controller.refresh();
+  assert.deepEqual(f.controller.guildCounts, {
+    loaded: 199,
+    reported: 200,
+    requests: 1,
+  });
+  assert.equal(f.controller.cache.current!.records.length, 199);
+  f.controller.stop();
+});
+test("guild count changes update without scans and unsubscribe on disable", async () => {
+  const f = fixture();
+  let listener: (() => void) | undefined;
+  f.stores.GuildStore!.addChangeListener = (fn) => {
+    listener = fn;
+  };
+  f.stores.GuildStore!.removeChangeListener = () => {
+    listener = undefined;
+  };
+  f.stores.UserGuildJoinRequestStore = {
+    hasFetchedRequestToJoinGuilds: false,
+    computeGuildIds: () => ["2"],
+  };
+  await f.controller.start();
+  assert.equal(f.controller.guildCounts.requests, null);
+  f.stores.GuildStore!.getGuilds = () => ({
+    "1": { id: "1", name: "First" },
+    "2": { id: "2", name: "Second" },
+  });
+  listener?.();
+  assert.equal(f.controller.guildCounts.loaded, 2);
+  assert.equal(f.controller.cache.current, null);
+  f.controller.stop();
+  assert.equal(listener, undefined);
+});
 test("multi-server leaving stops at the first rejection and preserves remaining records", async () => {
   const f = fixture(3);
   await f.controller.start();

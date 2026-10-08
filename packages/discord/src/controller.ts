@@ -22,6 +22,40 @@ export class Controller {
   error: string | null = null;
   diagnostics: { [name: string]: boolean } = {};
   scanTimes: number[] = [];
+  guildCounts: {
+    loaded: number | null;
+    reported: number | null;
+    requests: number | null;
+  } = { loaded: null, reported: null, requests: null };
+  private updateGuildCounts = () => {
+    let loaded: number | null = null,
+      reported: number | null = null,
+      requests: number | null = null;
+    try {
+      const guilds = this.stores.GuildStore?.getGuilds();
+      if (guilds) loaded = Object.keys(guilds).length;
+      const count = this.stores.GuildStore?.getGuildCount?.();
+      if (Number.isSafeInteger(count) && count! >= 0) reported = count!;
+      const requestStore = this.stores.UserGuildJoinRequestStore;
+      if (
+        guilds &&
+        requestStore &&
+        requestStore.hasFetchedRequestToJoinGuilds !== false
+      ) {
+        const ids = requestStore.computeGuildIds();
+        if (Array.isArray(ids))
+          requests = new Set(
+            ids.filter(
+              (id) => typeof id === "string" && /^\d+$/.test(id) && !guilds[id],
+            ),
+          ).size;
+      }
+    } catch {
+      /* Counts are unavailable rather than invented. */
+    }
+    this.guildCounts = { loaded, reported, requests };
+    this.emit();
+  };
   private listeners = new Set<() => void>();
   private generation = 0;
   private account = "";
@@ -63,6 +97,7 @@ export class Controller {
       this.stores = this.discover();
       this.diagnostics = storeStatus(this.stores);
       this.account = accountId(this.stores);
+      this.updateGuildCounts();
       const [settings, cache] = await Promise.all([
         this.storage.load(`settings:${this.account}`),
         this.storage.load(`cache:${this.account}`),
@@ -95,6 +130,10 @@ export class Controller {
           })),
         };
       this.stores.UserStore?.addChangeListener?.(this.accountListener);
+      this.stores.GuildStore?.addChangeListener?.(this.updateGuildCounts);
+      this.stores.UserGuildJoinRequestStore?.addChangeListener?.(
+        this.updateGuildCounts,
+      );
       this.emit();
     } catch {
       if (this.enabled && this.generation === generation) {
@@ -109,7 +148,12 @@ export class Controller {
     this.generation++;
     this.scanning = false;
     this.stores.UserStore?.removeChangeListener?.(this.accountListener);
+    this.stores.GuildStore?.removeChangeListener?.(this.updateGuildCounts);
+    this.stores.UserGuildJoinRequestStore?.removeChangeListener?.(
+      this.updateGuildCounts,
+    );
     this.stores = {};
+    this.guildCounts = { loaded: null, reported: null, requests: null };
     this.cache = emptyCache();
     this.account = "";
     this.baseline = null;
@@ -235,6 +279,7 @@ export class Controller {
   }
   async refresh() {
     if (!this.enabled || this.scanning || this.leaving) return;
+    this.updateGuildCounts();
     const generation = this.generation;
     this.scanning = true;
     this.error = null;

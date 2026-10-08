@@ -23,7 +23,18 @@ export interface Guild {
   owner_id?: string;
 }
 export interface Stores {
-  GuildStore?: { getGuilds(): { [id: string]: Guild } };
+  GuildStore?: {
+    getGuilds(): { [id: string]: Guild };
+    getGuildCount?(): number;
+    addChangeListener?(listener: () => void): void;
+    removeChangeListener?(listener: () => void): void;
+  };
+  UserGuildJoinRequestStore?: {
+    computeGuildIds(): string[];
+    hasFetchedRequestToJoinGuilds?: boolean;
+    addChangeListener?(listener: () => void): void;
+    removeChangeListener?(listener: () => void): void;
+  };
   ChannelStore?: {
     getMutableGuildChannelsForGuild(id: string): { [id: string]: Channel };
     getChannel(id: string): Channel | undefined;
@@ -52,6 +63,7 @@ export const STORE_NAMES = [
   "ReadStateStore",
   "GuildMemberCountStore",
   "ActiveJoinedThreadsStore",
+  "UserGuildJoinRequestStore",
 ] as const;
 export const VIEW_CHANNEL = 1n << 10n;
 export const READ_MESSAGE_HISTORY = 1n << 16n;
@@ -68,6 +80,7 @@ export function storeStatus(stores: Stores): { [name: string]: boolean } {
     ReadStateStore: "lastMessageId",
     GuildMemberCountStore: "getMemberCount",
     ActiveJoinedThreadsStore: "getActiveJoinedThreadsForGuild",
+    UserGuildJoinRequestStore: "computeGuildIds",
   };
   return Object.fromEntries(
     STORE_NAMES.map((name) => {

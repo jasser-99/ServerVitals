@@ -4,7 +4,7 @@
 
 ServerVitals shows the **Last Visible Activity** across your Discord servers, helping you identify active, quiet, inactive and dormant communities from one local dashboard. Separate implementations support **BetterDiscord** and a **Vencord custom userplugin**. No fixed server-count limit is imposed.
 
-> **Testing Build — 0.1.0-alpha.4**
+> **Testing Build — 0.1.0-alpha.5**
 >
 > This release has not completed the maintainer's manual stability checklist. Automated tests and source builds do not establish live Discord compatibility or stability. No stable release is published automatically.
 
@@ -26,15 +26,19 @@ Every row shows server name/icon, size when available, Last Visible Activity, La
 
 ## Screenshots
 
-![ServerVitals dashboard using synthetic demonstration data](docs/screenshots/dashboard-demo.png)
+![Live BetterDiscord dashboard sorted by oldest visible activity](docs/screenshots/betterdiscord-oldest-activity.png)
 
-This preview uses **synthetic demonstration data**, not a live Discord scan. Live BetterDiscord/Vencord screenshots should be added by the maintainer after installation testing, with private server information redacted.
+Maintainer-supplied live BetterDiscord screenshot, sorted by **Oldest Activity First**. Last Visible Activity, Last Scanned, cached evidence and confidence remain separate. The displayed server count and dates are examples from one account, not product limits or verified absolute server inactivity.
+
+![Live BetterDiscord dashboard showing Unknown activity results with sensitive names redacted](docs/screenshots/betterdiscord-unknown-redacted.png)
+
+Live BetterDiscord example of **Unknown** activity, with two server names/icons redacted for privacy. A member count can be cached even when activity is Unknown. See the explanation below. These screenshots demonstrate the maintainer's installation, not completion of the stability checklist or live Vencord verification.
 
 ## Features
 
 - One dashboard for any number of guilds available to the client.
 - Oldest/newest, alphabetical, server-size and lowest-confidence sorting. Unknown activity sorts after known dates.
-- Immediate local name search and combined activity/freshness/confidence/Keep filters.
+- Combined activity/confidence/Keep filters. Search is temporarily removed in the local unreleased build while BetterDiscord typing problems are investigated.
 - Local Keep metadata and optional hiding from the server view, without changing activity or overall statistics.
 - Monotonic activity cache, separate inspection time, coverage-derived confidence and two-scan comparison.
 - Loaded thread/forum reply support, conservative unknown handling, diagnostic counts and measured scan duration.
@@ -46,6 +50,12 @@ This preview uses **synthetic demonstration data**, not a live Discord scan. Liv
 View Total Servers, Active Today, Active This Week, Inactive 7+/30+/90+ Days, Inactive 6+ Months, Dormant 1+ Year, Unknown Activity, Keep Servers, Cached Results, Partial Results and scanned source totals. Average and median days since known activity are also shown.
 
 Statistics include the entire list, including Keep and filtered-out guilds. Bands overlap: a server inactive for 200 days appears in several inactivity counts. Today means rolling 24 hours; six months means 180 days. Unknown never counts as dormant. These are contextual observations, not recommendations to leave servers.
+
+### Why a server count may differ from Discord's limit message
+
+The header separates the current **joined server count** reported by Discord's GuildStore from **loaded guild records** and **servers in the saved scan**. A saved scan can be older than your current memberships. Discord may also expose additional join-request entries without a joined guild record; these are counted separately when the local request store is loaded, not inserted into activity statistics or Leave selections.
+
+Diagnostics shows all four counts, or Unavailable when a source cannot be read. Guild-store changes update the lightweight counts without running an activity scan. For example, 199 joined guilds plus one join-request entry is a possible explanation for a discrepancy, not proof of Discord's account-slot accounting. ServerVitals does not query your membership limit, invent a missing server, force a total of 200 or diagnose the exact reason for a join failure. Use Check Now to update scan coverage, then compare the Diagnostics counts with Discord's server list.
 
 ## BetterDiscord Installation
 
@@ -101,6 +111,30 @@ Size is sortable and its column can be hidden. It never affects activity classif
 Compare current and previous full snapshots for new/removed servers, activity advances, category/threshold crossings, freshness/confidence changes, unknown/known transitions and meaningful size changes. Click a grouped change to filter current rows. Removed guilds remain named in the comparison for one scan.
 
 Activity advancement is called **New visible activity detected**. Category transitions use exact labels such as **Moved from Inactive to Active**, avoiding unsupported claims. Last Scanned alone creates no event. Missing current data normally becomes CACHED through monotonic retention rather than erasing known activity.
+
+## What Unknown activity means
+
+**Unknown means ServerVitals has no trustworthy visible-message timestamp for that server.** It is missing evidence, not an inactivity category. Unknown never becomes Dormant simply because no timestamp exists.
+
+Possible explanations include:
+
+- No text channels are accessible to your account, or there are no supported visible text channels.
+- A role, verification step or permission setting prevents access.
+- Discord has not loaded the relevant channel or last-message metadata.
+- Available channels have no usable last-message ID, or relevant thread/forum metadata is unavailable.
+- A temporarily unavailable guild or a Discord internal change prevents inspection.
+
+In the maintainer's supplied example, Discord itself displays **No text channels** and explains that the account either lacks access or the server has none. That supports an access/coverage explanation; it does not tell ServerVitals why access is missing. The plugin cannot infer a ban, deletion, an administrator's decision or abandonment from Unknown alone.
+
+The Channels column reports usable timestamp sources over expected loaded sources. **0/0** means no eligible sources were available to inspect; **0/1** means one expected source supplied no usable timestamp. Neither proves that the whole server has no messages.
+
+### Unknown and the cache
+
+Unknown can be saved in a scan snapshot with `lastVisibleActivity: null`, its inspection time and any available member-count metadata. It stays Unknown until trustworthy activity becomes available. Cached size and cached activity are independent: an approximate cached member count does not establish an activity date.
+
+If ServerVitals previously recorded a trustworthy activity timestamp and current metadata cannot confirm it, the monotonic cache normally retains that date with **CACHED** freshness instead of replacing it with Unknown. **Last Scanned** records the most recent inspection; it does not mean message metadata was complete or newly fetched.
+
+Try **Check Now** once after Discord finishes loading, inspect the server's visible channel list and review Diagnostics. ServerVitals does not probe hidden channels or make requests to determine whether you were banned or a server was deleted.
 
 ## Activity Categories
 
@@ -174,7 +208,7 @@ npm run check
 
 `packages/core` holds pure logic, `packages/discord` the scanner/controller, `packages/ui` the shared React view, and platform folders the adapters. `npm run build` produces the normal BetterDiscord plugin and a self-contained Vencord userplugin source folder. Runtime React comes from the host. Read [ARCHITECTURE.md](docs/ARCHITECTURE.md) for research, decisions and internal dependencies.
 
-Versions are synchronized at **0.1.0-alpha.4**. CI validates code/builds without publishing stable releases. Alpha publication is independent of upstream plugin directories.
+Versions are synchronized at **0.1.0-alpha.5**. CI validates code/builds without publishing stable releases. Alpha publication is independent of upstream plugin directories.
 
 ## Contributing
 

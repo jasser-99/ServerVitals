@@ -1,6 +1,6 @@
 # ServerVitals architecture
 
-Version: **0.1.0-alpha.4**. Documentation and source researched on 2026-10-07.
+Version: **0.1.0-alpha.5**. Documentation and source researched on 2026-10-07.
 
 ## Research and decisions
 
@@ -113,3 +113,9 @@ Both adapters discover the existing Discord module exposing `leaveGuild`. Better
 ## Text entry isolation
 
 While a dashboard is mounted, scoped window capture listeners stop propagation of keydown/keyup events originating in its text inputs, without preventDefault. Browser typing and editing shortcuts remain native; Tab/Escape and events outside ServerVitals pass through. Click/mousedown propagation is isolated on text fields. Unmount removes both listeners. This protects plain HTML inputs from surrounding client keybind handlers; synthetic tests reproduce a document handler redirecting focus and verify continuous character input and Backspace. These tests do not identify every live Discord focus interaction. No key values are logged or stored.
+
+Unreleased local update: search and the unsuccessful keyboard interception workaround have been removed. The text-entry isolation above describes alpha.4, not the current unreleased dashboard.
+
+## Membership counts versus scan coverage
+
+Read the loaded GuildStore map, its optional getGuildCount, and UserGuildJoinRequestStore.computeGuildIds independently. Additional join-request IDs are deduplicated and excluded when a joined guild record exists. An unfetched or unavailable request store reports Unavailable rather than zero. The request entries are not treated as joined guilds, scanned activity sources or leave targets. Lightweight GuildStore/request-store subscriptions update counts and are removed on stop; they never trigger activity scanning. The header and Diagnostics distinguish these client-local observations from the saved snapshot count. No account-limit request or hardcoded correction is used. This follows the independent-count approach observed in Vencord's serverListIndicators source, not a claim about Discord's undocumented slot accounting.

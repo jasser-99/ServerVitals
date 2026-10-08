@@ -1,7 +1,7 @@
 import { build } from "esbuild";
 import { chromium } from "playwright";
 import { createServer } from "node:http";
-import { mkdir, writeFile, readFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 const output = await build({
   entryPoints: ["scripts/preview.tsx"],
@@ -86,9 +86,7 @@ try {
     path: "docs/screenshots/dashboard-demo.png",
     fullPage: true,
   });
-  await page.getByRole("searchbox").fill("counter");
-  assert.equal(await page.locator("tbody tr").count(), 1);
-  await page.getByRole("searchbox").fill("");
+  assert.equal(await page.getByRole("searchbox").count(), 0);
   await page.getByLabel("Sort by", { exact: true }).click();
   await page
     .getByRole("button", { name: "Largest Server First", exact: true })
@@ -162,22 +160,7 @@ try {
   assert.ok(dialog.width > 700 && dialog.height > 850);
   await page.getByRole("button", { name: "Check Now", exact: true }).click();
   await page.locator("tbody tr").first().waitFor();
-  await page.getByRole("searchbox").fill("not matching");
-  assert.equal(await page.locator("tbody tr").count(), 0);
-  await page.getByRole("searchbox").fill("");
-  await page.getByRole("searchbox").click();
-  await page.getByRole("searchbox").pressSequentially("Test", { delay: 80 });
-  assert.equal(await page.getByRole("searchbox").inputValue(), "Test");
-  assert.equal(
-    await page
-      .getByRole("searchbox")
-      .evaluate((element) => element === document.activeElement),
-    true,
-  );
-  await page.getByRole("searchbox").press("Backspace");
-  assert.equal(await page.getByRole("searchbox").inputValue(), "Tes");
-  await page.getByRole("searchbox").pressSequentially("t", { delay: 80 });
-  assert.equal(await page.locator("tbody tr").count(), 1);
+  assert.equal(await page.getByRole("searchbox").count(), 0);
   await page.getByLabel("Sort by", { exact: true }).click();
   await page
     .getByRole("button", { name: "Newest Activity First", exact: true })
@@ -220,12 +203,8 @@ try {
   );
   assert.deepEqual(errors, []);
   assert.deepEqual(external, []);
-  await writeFile(
-    "docs/screenshots/README.md",
-    "# Dashboard preview\n\n`dashboard-demo.png` is an actual browser capture of the shared React dashboard using synthetic fixture data. It is not a live BetterDiscord/Vencord screenshot or a compatibility claim. The preview banner is part of the testing harness, not the plugin.\n",
-  );
   console.info(
-    "Browser UI checks passed: rendering, search, size sort, Keep, filters, statistics, change drill-down, CSV download, diagnostics, settings and narrow layout. Zero page errors or external requests in the synthetic preview.",
+    "Browser UI checks passed: rendering, search removal, size sort, Keep, filters, statistics, change drill-down, CSV download, diagnostics, settings and narrow layout. Zero page errors or external requests in the synthetic preview.",
   );
 } finally {
   await browser?.close();

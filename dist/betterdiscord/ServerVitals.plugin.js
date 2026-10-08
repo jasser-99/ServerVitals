@@ -1,14 +1,14 @@
 /**
  * @name ServerVitals
  * @author ServerVitals contributors
- * @version 0.1.0-alpha.4
+ * @version 0.1.0-alpha.5
  * @description Find the servers that have gone quiet. Independent alpha. Initial implementation 100% AI generated.
  * @license GPL-3.0-or-later
  */
 "use strict";
 
 // packages/core/src/index.ts
-var VERSION = "0.1.0-alpha.4";
+var VERSION = "0.1.0-alpha.5";
 var DAY = 864e5;
 var EPOCH = 14200704e5;
 var DEFAULT_SETTINGS = {
@@ -424,7 +424,8 @@ var STORE_NAMES = [
   ...REQUIRED,
   "ReadStateStore",
   "GuildMemberCountStore",
-  "ActiveJoinedThreadsStore"
+  "ActiveJoinedThreadsStore",
+  "UserGuildJoinRequestStore"
 ];
 var VIEW_CHANNEL = 1n << 10n;
 var READ_MESSAGE_HISTORY = 1n << 16n;
@@ -439,7 +440,8 @@ function storeStatus(stores) {
     UserStore: "getCurrentUser",
     ReadStateStore: "lastMessageId",
     GuildMemberCountStore: "getMemberCount",
-    ActiveJoinedThreadsStore: "getActiveJoinedThreadsForGuild"
+    ActiveJoinedThreadsStore: "getActiveJoinedThreadsForGuild",
+    UserGuildJoinRequestStore: "computeGuildIds"
   };
   return Object.fromEntries(
     STORE_NAMES.map((name) => {
@@ -640,6 +642,29 @@ var Controller = class {
   error = null;
   diagnostics = {};
   scanTimes = [];
+  guildCounts = { loaded: null, reported: null, requests: null };
+  updateGuildCounts = () => {
+    let loaded = null, reported = null, requests = null;
+    try {
+      const guilds = this.stores.GuildStore?.getGuilds();
+      if (guilds) loaded = Object.keys(guilds).length;
+      const count = this.stores.GuildStore?.getGuildCount?.();
+      if (Number.isSafeInteger(count) && count >= 0) reported = count;
+      const requestStore = this.stores.UserGuildJoinRequestStore;
+      if (guilds && requestStore && requestStore.hasFetchedRequestToJoinGuilds !== false) {
+        const ids = requestStore.computeGuildIds();
+        if (Array.isArray(ids))
+          requests = new Set(
+            ids.filter(
+              (id) => typeof id === "string" && /^\d+$/.test(id) && !guilds[id]
+            )
+          ).size;
+      }
+    } catch {
+    }
+    this.guildCounts = { loaded, reported, requests };
+    this.emit();
+  };
   listeners = /* @__PURE__ */ new Set();
   generation = 0;
   account = "";
@@ -674,6 +699,7 @@ var Controller = class {
       this.stores = this.discover();
       this.diagnostics = storeStatus(this.stores);
       this.account = accountId(this.stores);
+      this.updateGuildCounts();
       const [settings, cache] = await Promise.all([
         this.storage.load(`settings:${this.account}`),
         this.storage.load(`cache:${this.account}`)
@@ -694,6 +720,10 @@ var Controller = class {
           }))
         };
       this.stores.UserStore?.addChangeListener?.(this.accountListener);
+      this.stores.GuildStore?.addChangeListener?.(this.updateGuildCounts);
+      this.stores.UserGuildJoinRequestStore?.addChangeListener?.(
+        this.updateGuildCounts
+      );
       this.emit();
     } catch {
       if (this.enabled && this.generation === generation) {
@@ -707,7 +737,12 @@ var Controller = class {
     this.generation++;
     this.scanning = false;
     this.stores.UserStore?.removeChangeListener?.(this.accountListener);
+    this.stores.GuildStore?.removeChangeListener?.(this.updateGuildCounts);
+    this.stores.UserGuildJoinRequestStore?.removeChangeListener?.(
+      this.updateGuildCounts
+    );
     this.stores = {};
+    this.guildCounts = { loaded: null, reported: null, requests: null };
     this.cache = emptyCache();
     this.account = "";
     this.baseline = null;
@@ -817,6 +852,7 @@ var Controller = class {
   }
   async refresh() {
     if (!this.enabled || this.scanning || this.leaving) return;
+    this.updateGuildCounts();
     const generation = this.generation;
     this.scanning = true;
     this.error = null;
@@ -920,27 +956,11 @@ function createDashboard(React, controller, navigation) {
     }
   }
   function Dashboard() {
-    const dashboardRoot = React.useRef(null);
-    React.useEffect(() => {
-      const isolateTextKey = (event) => {
-        const target = event.target;
-        if (!(target instanceof HTMLInputElement) || !dashboardRoot.current?.contains(target) || target.type === "checkbox" || event.key === "Tab" || event.key === "Escape")
-          return;
-        event.stopImmediatePropagation();
-      };
-      window.addEventListener("keydown", isolateTextKey, true);
-      window.addEventListener("keyup", isolateTextKey, true);
-      return () => {
-        window.removeEventListener("keydown", isolateTextKey, true);
-        window.removeEventListener("keyup", isolateTextKey, true);
-      };
-    }, []);
     const revision = React.useSyncExternalStore(
       controller.subscribe,
       controller.getRevision,
       controller.getRevision
     );
-    const [search, setSearch] = React.useState("");
     const [sort, setSort] = React.useState("oldest");
     const [filters, setFilters] = React.useState([]);
     const [ids, setIds] = React.useState();
@@ -972,7 +992,7 @@ function createDashboard(React, controller, navigation) {
       () => selectRecords(
         records,
         {
-          search,
+          search: "",
           sort,
           filters,
           hideKeep: controller.settings.hideKeep,
@@ -980,7 +1000,7 @@ function createDashboard(React, controller, navigation) {
         },
         now
       ),
-      [records, search, sort, filters, ids, now, controller.settings.hideKeep]
+      [records, sort, filters, ids, now, controller.settings.hideKeep]
     );
     const stats = React.useMemo(() => statistics(records, now), [records, now]);
     const changes = React.useMemo(
@@ -995,7 +1015,7 @@ function createDashboard(React, controller, navigation) {
     }, [changes]);
     React.useEffect(() => {
       setPage(0);
-    }, [search, sort, filters, ids, controller.settings.hideKeep]);
+    }, [sort, filters, ids, controller.settings.hideKeep]);
     const pages = Math.max(1, Math.ceil(selected.length / 50));
     const currentPage = Math.min(page, pages - 1);
     const date = (value) => value === null ? "Unknown" : new Date(value).toLocaleString();
@@ -1003,339 +1023,309 @@ function createDashboard(React, controller, navigation) {
       if (!navigation.open(guildId, channelId))
         setNotice("Discord navigation is unavailable in this client version.");
     };
-    return /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("section", { className: "sv-root", "aria-label": "ServerVitals dashboard" }, /* @__PURE__ */ React.createElement("style", null, CSS), /* @__PURE__ */ React.createElement("header", { className: "sv-header" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "sv-eyebrow" }, "LOCAL SERVER OVERVIEW \xB7 ", VERSION), /* @__PURE__ */ React.createElement("h1", null, "ServerVitals"), /* @__PURE__ */ React.createElement("p", null, "Find the servers that have gone quiet.")), /* @__PURE__ */ React.createElement("div", { className: "sv-scan" }, /* @__PURE__ */ React.createElement("strong", null, controller.guildCounts.reported ?? controller.guildCounts.loaded ?? "Unknown", " ", "joined servers"), /* @__PURE__ */ React.createElement("small", null, records.length, " servers in saved scan \xB7", " ", controller.guildCounts.loaded ?? "Unknown", " loaded guild records"), controller.guildCounts.requests !== null && controller.guildCounts.requests > 0 && /* @__PURE__ */ React.createElement("small", null, controller.guildCounts.requests, " additional join-request entries (not activity-scanned memberships)"), /* @__PURE__ */ React.createElement("span", null, "Last Full Scan: ", snapshot ? date(snapshot.at) : "Not scanned"), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        disabled: !controller.enabled || controller.scanning || leaving,
+        onClick: () => {
+          void controller.refresh();
+        }
+      },
+      controller.scanning ? "Inspecting metadata\u2026" : "Check Now"
+    ))), /* @__PURE__ */ React.createElement("p", { className: "sv-info" }, "Last Visible Activity reflects metadata visible to your account. Missing private channels and unloaded threads limit coverage. Leaving requires your explicit selection and confirmation."), controller.error && /* @__PURE__ */ React.createElement("p", { role: "alert", className: "sv-error" }, controller.error), notice && /* @__PURE__ */ React.createElement("p", { role: "status" }, notice, " ", /* @__PURE__ */ React.createElement("button", { onClick: () => setNotice("") }, "Dismiss")), /* @__PURE__ */ React.createElement("nav", { className: "sv-tabs", "aria-label": "Dashboard sections" }, [
+      "Servers",
+      "Statistics",
+      "What Changed",
+      "Diagnostics",
+      "Settings",
+      "Privacy"
+    ].map((t) => /* @__PURE__ */ React.createElement("button", { key: t, "aria-pressed": tab === t, onClick: () => setTab(t) }, t))), tab === "Servers" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "sv-stats" }, [
+      "Total Servers",
+      "Active Today",
+      "Inactive 30+ Days",
+      "Inactive 6+ Months",
+      "Dormant 1+ Year",
+      "Unknown Activity"
+    ].map((key) => /* @__PURE__ */ React.createElement("div", { key }, /* @__PURE__ */ React.createElement("strong", null, stats[key]), /* @__PURE__ */ React.createElement("span", null, key === "Total Servers" ? "Servers in Scan" : key)))), /* @__PURE__ */ React.createElement("div", { className: "sv-controls" }, /* @__PURE__ */ React.createElement("details", { className: "sv-sort-menu" }, /* @__PURE__ */ React.createElement("summary", { "aria-label": "Sort by" }, "Sort by: ", SORTS[sort]), /* @__PURE__ */ React.createElement("div", { role: "group", "aria-label": "Sort orders" }, Object.entries(SORTS).map(([key, label]) => /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key,
+        "aria-pressed": sort === key,
+        onClick: (e) => {
+          setSort(key);
+          const menu = e.currentTarget.closest("details");
+          if (menu) menu.open = false;
+        }
+      },
+      label
+    )))), /* @__PURE__ */ React.createElement("button", { onClick: () => download("csv") }, "Export CSV (all)"), /* @__PURE__ */ React.createElement("button", { onClick: () => download("json") }, "Export JSON (all)")), /* @__PURE__ */ React.createElement("details", { className: "sv-filters" }, /* @__PURE__ */ React.createElement("summary", null, "Filters", " ", filters.length ? `(${filters.length} combined with AND)` : "(All)"), /* @__PURE__ */ React.createElement("div", null, FILTERS.filter(
+      (f) => f !== "All" && !f.startsWith("Freshness:")
+    ).map((f) => /* @__PURE__ */ React.createElement("label", { key: f }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "checkbox",
+        checked: filters.includes(f),
+        onChange: () => setFilters(
+          filters.includes(f) ? filters.filter((x) => x !== f) : [...filters, f]
+        )
+      }
+    ), f))), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => {
+          setFilters([]);
+          setIds(void 0);
+        }
+      },
+      "Clear filters"
+    )), ids && /* @__PURE__ */ React.createElement("p", null, "Showing servers from a scan change.", " ", /* @__PURE__ */ React.createElement("button", { onClick: () => setIds(void 0) }, "Show all servers")), /* @__PURE__ */ React.createElement("p", null, selected.length, " matching servers \xB7", " ", controller.settings.hideKeep ? "Keep servers hidden" : "Keep servers included"), /* @__PURE__ */ React.createElement("div", { className: "sv-controls" }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        disabled: leaving,
+        onClick: () => setMarked(
+          selected.filter((r) => !r.keep).map((r) => r.guildId)
+        )
+      },
+      "Select matching servers"
+    ), /* @__PURE__ */ React.createElement("button", { disabled: leaving, onClick: () => setMarked([]) }, "Clear selection"), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        disabled: !navigation.leave || !marked.length || leaving || controller.scanning,
+        onClick: () => setConfirmLeave([...marked])
+      },
+      "Leave selected servers (",
+      marked.length,
+      ")"
+    )), confirmLeave && /* @__PURE__ */ React.createElement(
       "section",
       {
-        ref: dashboardRoot,
-        className: "sv-root",
-        "aria-label": "ServerVitals dashboard"
+        className: "sv-error",
+        "aria-label": "Confirm leaving servers"
       },
-      /* @__PURE__ */ React.createElement("style", null, CSS),
-      /* @__PURE__ */ React.createElement("header", { className: "sv-header" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "sv-eyebrow" }, "LOCAL SERVER OVERVIEW \xB7 ", VERSION), /* @__PURE__ */ React.createElement("h1", null, "ServerVitals"), /* @__PURE__ */ React.createElement("p", null, "Find the servers that have gone quiet.")), /* @__PURE__ */ React.createElement("div", { className: "sv-scan" }, /* @__PURE__ */ React.createElement("strong", null, records.length, " Servers"), /* @__PURE__ */ React.createElement("span", null, "Last Full Scan: ", snapshot ? date(snapshot.at) : "Not scanned"), /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          disabled: !controller.enabled || controller.scanning || leaving,
-          onClick: () => {
-            void controller.refresh();
-          }
-        },
-        controller.scanning ? "Inspecting metadata\u2026" : "Check Now"
-      ))),
-      /* @__PURE__ */ React.createElement("p", { className: "sv-info" }, "Last Visible Activity reflects metadata visible to your account. Missing private channels and unloaded threads limit coverage. Leaving requires your explicit selection and confirmation."),
-      controller.error && /* @__PURE__ */ React.createElement("p", { role: "alert", className: "sv-error" }, controller.error),
-      notice && /* @__PURE__ */ React.createElement("p", { role: "status" }, notice, " ", /* @__PURE__ */ React.createElement("button", { onClick: () => setNotice("") }, "Dismiss")),
-      /* @__PURE__ */ React.createElement("nav", { className: "sv-tabs", "aria-label": "Dashboard sections" }, [
-        "Servers",
-        "Statistics",
-        "What Changed",
-        "Diagnostics",
-        "Settings",
-        "Privacy"
-      ].map((t) => /* @__PURE__ */ React.createElement("button", { key: t, "aria-pressed": tab === t, onClick: () => setTab(t) }, t))),
-      tab === "Servers" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "sv-stats" }, [
-        "Total Servers",
-        "Active Today",
-        "Inactive 30+ Days",
-        "Inactive 6+ Months",
-        "Dormant 1+ Year",
-        "Unknown Activity"
-      ].map((key) => /* @__PURE__ */ React.createElement("div", { key }, /* @__PURE__ */ React.createElement("strong", null, stats[key]), /* @__PURE__ */ React.createElement("span", null, key)))), /* @__PURE__ */ React.createElement("div", { className: "sv-controls" }, /* @__PURE__ */ React.createElement("label", null, "Search servers", /* @__PURE__ */ React.createElement(
-        "input",
-        {
-          type: "search",
-          onMouseDown: (e) => e.stopPropagation(),
-          onClick: (e) => e.stopPropagation(),
-          placeholder: "Search server names\u2026",
-          value: search,
-          onChange: (e) => setSearch(e.target.value)
-        }
-      )), /* @__PURE__ */ React.createElement("details", { className: "sv-sort-menu" }, /* @__PURE__ */ React.createElement("summary", { "aria-label": "Sort by" }, "Sort by: ", SORTS[sort]), /* @__PURE__ */ React.createElement("div", { role: "group", "aria-label": "Sort orders" }, Object.entries(SORTS).map(([key, label]) => /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          key,
-          "aria-pressed": sort === key,
-          onClick: (e) => {
-            setSort(key);
-            const menu = e.currentTarget.closest("details");
-            if (menu) menu.open = false;
-          }
-        },
-        label
-      )))), /* @__PURE__ */ React.createElement("button", { onClick: () => download("csv") }, "Export CSV (all)"), /* @__PURE__ */ React.createElement("button", { onClick: () => download("json") }, "Export JSON (all)")), /* @__PURE__ */ React.createElement("details", { className: "sv-filters" }, /* @__PURE__ */ React.createElement("summary", null, "Filters", " ", filters.length ? `(${filters.length} combined with AND)` : "(All)"), /* @__PURE__ */ React.createElement("div", null, FILTERS.filter(
-        (f) => f !== "All" && !f.startsWith("Freshness:")
-      ).map((f) => /* @__PURE__ */ React.createElement("label", { key: f }, /* @__PURE__ */ React.createElement(
-        "input",
-        {
-          type: "checkbox",
-          checked: filters.includes(f),
-          onChange: () => setFilters(
-            filters.includes(f) ? filters.filter((x) => x !== f) : [...filters, f]
-          )
-        }
-      ), f))), /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          onClick: () => {
-            setFilters([]);
-            setIds(void 0);
-          }
-        },
-        "Clear filters"
-      )), ids && /* @__PURE__ */ React.createElement("p", null, "Showing servers from a scan change.", " ", /* @__PURE__ */ React.createElement("button", { onClick: () => setIds(void 0) }, "Show all servers")), /* @__PURE__ */ React.createElement("p", null, selected.length, " matching servers \xB7", " ", controller.settings.hideKeep ? "Keep servers hidden" : "Keep servers included"), /* @__PURE__ */ React.createElement("div", { className: "sv-controls" }, /* @__PURE__ */ React.createElement(
+      /* @__PURE__ */ React.createElement("h2", null, "Leave ", confirmLeave.length, " selected servers?"),
+      /* @__PURE__ */ React.createElement("p", null, "This changes your Discord memberships. You may need a new invitation to rejoin. Keep servers and servers you own are protected. The batch stops at the first error."),
+      /* @__PURE__ */ React.createElement("ul", null, confirmLeave.map((id) => /* @__PURE__ */ React.createElement("li", { key: id }, records.find((r) => r.guildId === id)?.name ?? "Unavailable server"))),
+      /* @__PURE__ */ React.createElement(
         "button",
         {
           disabled: leaving,
-          onClick: () => setMarked(
-            selected.filter((r) => !r.keep).map((r) => r.guildId)
-          )
+          onClick: () => setConfirmLeave(null)
         },
-        "Select matching servers"
-      ), /* @__PURE__ */ React.createElement("button", { disabled: leaving, onClick: () => setMarked([]) }, "Clear selection"), /* @__PURE__ */ React.createElement(
+        "Cancel leaving"
+      ),
+      " ",
+      /* @__PURE__ */ React.createElement(
         "button",
         {
-          disabled: !navigation.leave || !marked.length || leaving || controller.scanning,
-          onClick: () => setConfirmLeave([...marked])
-        },
-        "Leave selected servers (",
-        marked.length,
-        ")"
-      )), confirmLeave && /* @__PURE__ */ React.createElement(
-        "section",
-        {
-          className: "sv-error",
-          "aria-label": "Confirm leaving servers"
-        },
-        /* @__PURE__ */ React.createElement("h2", null, "Leave ", confirmLeave.length, " selected servers?"),
-        /* @__PURE__ */ React.createElement("p", null, "This changes your Discord memberships. You may need a new invitation to rejoin. Keep servers and servers you own are protected. The batch stops at the first error."),
-        /* @__PURE__ */ React.createElement("ul", null, confirmLeave.map((id) => /* @__PURE__ */ React.createElement("li", { key: id }, records.find((r) => r.guildId === id)?.name ?? "Unavailable server"))),
-        /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            disabled: leaving,
-            onClick: () => setConfirmLeave(null)
-          },
-          "Cancel leaving"
-        ),
-        " ",
-        /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            disabled: leaving || controller.scanning || !navigation.leave,
-            onClick: async () => {
-              if (!navigation.leave || leaving) return;
-              setLeaving(true);
-              const result = await controller.leaveSelected(
-                confirmLeave,
-                navigation.leave
-              );
-              setMarked(
-                (current) => current.filter((id) => !result.left.includes(id))
-              );
-              setNotice(
-                `Left ${result.left.length} server(s). ${result.error ?? "Selected memberships updated."}`
-              );
-              setLeaving(false);
-              setConfirmLeave(null);
-            }
-          },
-          leaving ? "Leaving selected servers\u2026" : `Confirm leave ${confirmLeave.length} servers`
-        )
-      ), /* @__PURE__ */ React.createElement("div", { className: "sv-table-wrap" }, /* @__PURE__ */ React.createElement("table", null, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", null, "Select"), /* @__PURE__ */ React.createElement("th", null, "Server"), controller.settings.showSize && /* @__PURE__ */ React.createElement("th", null, "Server Size"), /* @__PURE__ */ React.createElement("th", null, "Last Visible Activity"), /* @__PURE__ */ React.createElement("th", null, "Last Scanned"), /* @__PURE__ */ React.createElement("th", null, "Status"), /* @__PURE__ */ React.createElement("th", null, "Freshness"), /* @__PURE__ */ React.createElement("th", null, "Confidence"), /* @__PURE__ */ React.createElement("th", null, "Channels"), /* @__PURE__ */ React.createElement("th", null, "Keep"), /* @__PURE__ */ React.createElement("th", null, "Actions"))), /* @__PURE__ */ React.createElement("tbody", null, selected.slice(currentPage * 50, (currentPage + 1) * 50).map((r) => /* @__PURE__ */ React.createElement("tr", { key: r.guildId }, /* @__PURE__ */ React.createElement("td", null, /* @__PURE__ */ React.createElement(
-        "input",
-        {
-          type: "checkbox",
-          "aria-label": `Select ${r.name} to leave`,
-          disabled: r.keep || leaving,
-          checked: marked.includes(r.guildId),
-          onChange: (e) => setMarked(
-            e.target.checked ? [...marked, r.guildId] : marked.filter((id) => id !== r.guildId)
-          )
-        }
-      )), /* @__PURE__ */ React.createElement("td", null, /* @__PURE__ */ React.createElement("div", { className: "sv-server" }, r.icon ? /* @__PURE__ */ React.createElement(
-        "img",
-        {
-          src: r.icon,
-          alt: "",
-          loading: "lazy",
-          width: 32,
-          height: 32
-        }
-      ) : /* @__PURE__ */ React.createElement("span", { className: "sv-icon", "aria-hidden": "true" }, r.name.slice(0, 1)), /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          className: "sv-name",
-          onClick: () => navigate(r.guildId)
-        },
-        r.name
-      )), r.sourceChannelId && /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          className: "sv-link",
-          onClick: () => navigate(r.guildId, r.sourceChannelId)
-        },
-        "Open Last Active Channel"
-      )), controller.settings.showSize && /* @__PURE__ */ React.createElement(
-        "td",
-        {
-          title: r.size.accuracy === "exact" ? "Explicit member count from loaded guild metadata" : "Approximate count from loaded Discord metadata"
-        },
-        formatSize(r.size),
-        /* @__PURE__ */ React.createElement("small", null, r.size.accuracy, r.size.cached ? " \xB7 cached" : "")
-      ), /* @__PURE__ */ React.createElement("td", { title: date(r.lastVisibleActivity) }, relativeTime(r.lastVisibleActivity, now)), /* @__PURE__ */ React.createElement("td", { title: date(r.lastScanned) }, relativeTime(r.lastScanned, now)), /* @__PURE__ */ React.createElement("td", null, r.category), /* @__PURE__ */ React.createElement("td", null, /* @__PURE__ */ React.createElement(
-        "span",
-        {
-          className: `sv-badge sv-${r.freshness.toLowerCase()}`,
-          title: r.freshness === "CACHED" ? "Retained from an earlier observation; current metadata could not confirm it" : "Current metadata inspected; PARTIAL indicates coverage gaps"
-        },
-        r.freshness
-      )), /* @__PURE__ */ React.createElement("td", null, /* @__PURE__ */ React.createElement(
-        "span",
-        {
-          className: "sv-badge",
-          title: `Coverage score ${r.confidenceScore}/100. ${r.evidence.inspected}/${r.evidence.expected} loaded sources supplied valid IDs. Threads: ${r.evidence.threadCoverage}. ${r.evidence.issues.join(". ")}`
-        },
-        r.confidence
-      )), /* @__PURE__ */ React.createElement(
-        "td",
-        {
-          title: `${r.evidence.missing} missing; ${r.evidence.threads} loaded threads; ${r.evidence.forums} forums`
-        },
-        r.evidence.inspected,
-        "/",
-        r.evidence.expected
-      ), /* @__PURE__ */ React.createElement("td", null, /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          "aria-label": `Keep ${r.name}`,
-          "aria-pressed": r.keep,
-          onClick: () => {
-            void controller.toggleKeep(r.guildId);
-          }
-        },
-        r.keep ? "\u2605 Keep" : "\u2606 Keep"
-      )), /* @__PURE__ */ React.createElement("td", null, /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          disabled: r.keep || leaving || controller.scanning || !navigation.leave,
-          onClick: () => setConfirmLeave([r.guildId])
-        },
-        "Leave server"
-      ))))))), !selected.length && /* @__PURE__ */ React.createElement("p", { className: "sv-empty" }, snapshot ? "No servers match this view." : "Check Now to inspect currently loaded Discord metadata."), /* @__PURE__ */ React.createElement("div", { className: "sv-controls" }, /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          disabled: currentPage === 0,
-          onClick: () => setPage(currentPage - 1)
-        },
-        "Previous"
-      ), /* @__PURE__ */ React.createElement("span", null, "Page ", currentPage + 1, " of ", pages), /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          disabled: currentPage + 1 >= pages,
-          onClick: () => setPage(currentPage + 1)
-        },
-        "Next"
-      ))),
-      tab === "Statistics" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h2", null, "Statistics Dashboard"), /* @__PURE__ */ React.createElement("p", null, "Totals cover the full server list, including Keep servers. Inactivity bands overlap. \u201CToday\u201D is a rolling 24 hours; six months means 180 days."), /* @__PURE__ */ React.createElement("div", { className: "sv-stats" }, Object.entries(stats).map(([name, value]) => /* @__PURE__ */ React.createElement("div", { key: name }, /* @__PURE__ */ React.createElement("strong", null, value ?? "\u2014"), /* @__PURE__ */ React.createElement("span", null, name))))),
-      tab === "What Changed" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h2", null, "What Changed Since Last Scan"), /* @__PURE__ */ React.createElement("p", null, controller.cache.previous ? `${date(controller.cache.previous.at)} \u2192 ${date(snapshot?.at ?? null)}` : "Complete two full scans to compare results."), /* @__PURE__ */ React.createElement("p", null, "Changes describe local observations and time thresholds, not proof of server abandonment."), /* @__PURE__ */ React.createElement("ul", { className: "sv-changes" }, groups.map(([label, events]) => /* @__PURE__ */ React.createElement("li", { key: label }, /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          onClick: () => {
-            setIds([...new Set(events.map((e) => e.guildId))]);
-            setFilters([]);
-            setSearch("");
-            setTab("Servers");
-          }
-        },
-        events.length,
-        " \xB7 ",
-        label
-      ), /* @__PURE__ */ React.createElement("small", null, events.map((e) => e.name).join(", "))))), controller.cache.previous && !changes.length && /* @__PURE__ */ React.createElement("p", null, "No meaningful changes."), /* @__PURE__ */ React.createElement("p", null, "Removed servers remain named here for this comparison; they cannot be opened from the current list.")),
-      tab === "Diagnostics" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h2", null, "Local diagnostics"), /* @__PURE__ */ React.createElement("dl", null, Object.entries({
-        "Guilds discovered": records.length,
-        "Guilds scanned": records.length,
-        "Visible channels scanned": stats["Visible Channels Scanned"],
-        "Thread sources scanned": records.reduce(
-          (s, r) => s + r.evidence.threads,
-          0
-        ),
-        "Forum sources scanned": records.reduce(
-          (s, r) => s + r.evidence.forums,
-          0
-        ),
-        "Live results": records.filter((r) => r.freshness === "LIVE").length,
-        "Cached results": stats["Cached Results"],
-        "Partial results": stats["Partial Results"],
-        "Unknown results": stats["Unknown Activity"],
-        "Latest scan ms": snapshot?.durationMs ?? "\u2014",
-        "Average session scan ms": controller.scanTimes.length ? Math.round(
-          controller.scanTimes.reduce((a, b) => a + b, 0) / controller.scanTimes.length
-        ) : "\u2014",
-        "Cache bytes (UTF-8)": new TextEncoder().encode(
-          JSON.stringify(controller.cache)
-        ).length,
-        "Last full scan": date(snapshot?.at ?? null),
-        ...Object.fromEntries(
-          Object.entries(controller.diagnostics).map(
-            ([name, found]) => [name, found ? "Found" : "Unavailable"]
-          )
-        )
-      }).map(([key, value]) => /* @__PURE__ */ React.createElement(React.Fragment, { key }, /* @__PURE__ */ React.createElement("dt", null, key), /* @__PURE__ */ React.createElement("dd", null, value)))), /* @__PURE__ */ React.createElement("p", null, "Only loaded thread coverage is available in this alpha. Modules are discovered once per enable.")),
-      tab === "Settings" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h2", null, "Settings"), /* @__PURE__ */ React.createElement("p", null, "Scans run only when you click Check Now. Opening ServerVitals shows saved results."), /* @__PURE__ */ React.createElement("p", null, "Activity cache:", " ", new TextEncoder().encode(JSON.stringify(controller.cache)).length.toLocaleString(), " ", "bytes (UTF-8 data). Includes at most the current and previous scan; repeated checks replace snapshots rather than append history. Storage containers may add overhead."), [
-        ["debug", "Debug Mode (aggregate counts only)"],
-        ["showSize", "Show Server Size column"],
-        ["hideKeep", "Hide Keep servers from the server view"]
-      ].map(([key, label]) => /* @__PURE__ */ React.createElement("label", { className: "sv-setting", key }, /* @__PURE__ */ React.createElement(
-        "input",
-        {
-          type: "checkbox",
-          checked: controller.settings[key],
-          onChange: (e) => {
-            void controller.updateSettings({ [key]: e.target.checked });
-          }
-        }
-      ), label)), /* @__PURE__ */ React.createElement("label", { className: "sv-setting" }, "Category thresholds in days (four increasing numbers)", /* @__PURE__ */ React.createElement(
-        "input",
-        {
-          value: thresholds,
-          onMouseDown: (e) => e.stopPropagation(),
-          onClick: (e) => e.stopPropagation(),
-          onChange: (e) => setThresholds(e.target.value)
-        }
-      )), /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          onClick: () => {
-            const values = thresholds.split(",").map((v) => Number(v.trim()));
-            if (values.length !== 4 || !values.every(
-              (n, i) => Number.isFinite(n) && n >= 1 && n <= 36500 && (i === 0 || n > values[i - 1])
-            )) {
-              setNotice(
-                "Enter four increasing day thresholds, for example 7, 30, 180, 365."
-              );
-              return;
-            }
-            void controller.updateSettings({
-              thresholds: values
-            });
-            setNotice(
-              "Category thresholds saved. Statistics retain their named day ranges."
+          disabled: leaving || controller.scanning || !navigation.leave,
+          onClick: async () => {
+            if (!navigation.leave || leaving) return;
+            setLeaving(true);
+            const result = await controller.leaveSelected(
+              confirmLeave,
+              navigation.leave
             );
+            setMarked(
+              (current) => current.filter((id) => !result.left.includes(id))
+            );
+            setNotice(
+              `Left ${result.left.length} server(s). ${result.error ?? "Selected memberships updated."}`
+            );
+            setLeaving(false);
+            setConfirmLeave(null);
           }
         },
-        "Save thresholds"
-      ), /* @__PURE__ */ React.createElement("details", { className: "sv-reset" }, /* @__PURE__ */ React.createElement("summary", null, "Reset activity cache"), /* @__PURE__ */ React.createElement("p", null, "This clears current and previous observations, preserves Keep, and leaves the cache empty until you click Check Now. Older activity may then be unknown."), /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          disabled: controller.scanning || leaving,
-          onClick: () => {
-            void controller.resetCache();
+        leaving ? "Leaving selected servers\u2026" : `Confirm leave ${confirmLeave.length} servers`
+      )
+    ), /* @__PURE__ */ React.createElement("div", { className: "sv-table-wrap" }, /* @__PURE__ */ React.createElement("table", null, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", null, "Select"), /* @__PURE__ */ React.createElement("th", null, "Server"), controller.settings.showSize && /* @__PURE__ */ React.createElement("th", null, "Server Size"), /* @__PURE__ */ React.createElement("th", null, "Last Visible Activity"), /* @__PURE__ */ React.createElement("th", null, "Last Scanned"), /* @__PURE__ */ React.createElement("th", null, "Status"), /* @__PURE__ */ React.createElement("th", null, "Freshness"), /* @__PURE__ */ React.createElement("th", null, "Confidence"), /* @__PURE__ */ React.createElement("th", null, "Channels"), /* @__PURE__ */ React.createElement("th", null, "Keep"), /* @__PURE__ */ React.createElement("th", null, "Actions"))), /* @__PURE__ */ React.createElement("tbody", null, selected.slice(currentPage * 50, (currentPage + 1) * 50).map((r) => /* @__PURE__ */ React.createElement("tr", { key: r.guildId }, /* @__PURE__ */ React.createElement("td", null, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "checkbox",
+        "aria-label": `Select ${r.name} to leave`,
+        disabled: r.keep || leaving,
+        checked: marked.includes(r.guildId),
+        onChange: (e) => setMarked(
+          e.target.checked ? [...marked, r.guildId] : marked.filter((id) => id !== r.guildId)
+        )
+      }
+    )), /* @__PURE__ */ React.createElement("td", null, /* @__PURE__ */ React.createElement("div", { className: "sv-server" }, r.icon ? /* @__PURE__ */ React.createElement(
+      "img",
+      {
+        src: r.icon,
+        alt: "",
+        loading: "lazy",
+        width: 32,
+        height: 32
+      }
+    ) : /* @__PURE__ */ React.createElement("span", { className: "sv-icon", "aria-hidden": "true" }, r.name.slice(0, 1)), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "sv-name",
+        onClick: () => navigate(r.guildId)
+      },
+      r.name
+    )), r.sourceChannelId && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "sv-link",
+        onClick: () => navigate(r.guildId, r.sourceChannelId)
+      },
+      "Open Last Active Channel"
+    )), controller.settings.showSize && /* @__PURE__ */ React.createElement(
+      "td",
+      {
+        title: r.size.accuracy === "exact" ? "Explicit member count from loaded guild metadata" : "Approximate count from loaded Discord metadata"
+      },
+      formatSize(r.size),
+      /* @__PURE__ */ React.createElement("small", null, r.size.accuracy, r.size.cached ? " \xB7 cached" : "")
+    ), /* @__PURE__ */ React.createElement("td", { title: date(r.lastVisibleActivity) }, relativeTime(r.lastVisibleActivity, now)), /* @__PURE__ */ React.createElement("td", { title: date(r.lastScanned) }, relativeTime(r.lastScanned, now)), /* @__PURE__ */ React.createElement("td", null, r.category), /* @__PURE__ */ React.createElement("td", null, /* @__PURE__ */ React.createElement(
+      "span",
+      {
+        className: `sv-badge sv-${r.freshness.toLowerCase()}`,
+        title: r.freshness === "CACHED" ? "Retained from an earlier observation; current metadata could not confirm it" : "Current metadata inspected; PARTIAL indicates coverage gaps"
+      },
+      r.freshness
+    )), /* @__PURE__ */ React.createElement("td", null, /* @__PURE__ */ React.createElement(
+      "span",
+      {
+        className: "sv-badge",
+        title: `Coverage score ${r.confidenceScore}/100. ${r.evidence.inspected}/${r.evidence.expected} loaded sources supplied valid IDs. Threads: ${r.evidence.threadCoverage}. ${r.evidence.issues.join(". ")}`
+      },
+      r.confidence
+    )), /* @__PURE__ */ React.createElement(
+      "td",
+      {
+        title: `${r.evidence.missing} missing; ${r.evidence.threads} loaded threads; ${r.evidence.forums} forums`
+      },
+      r.evidence.inspected,
+      "/",
+      r.evidence.expected
+    ), /* @__PURE__ */ React.createElement("td", null, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        "aria-label": `Keep ${r.name}`,
+        "aria-pressed": r.keep,
+        onClick: () => {
+          void controller.toggleKeep(r.guildId);
+        }
+      },
+      r.keep ? "\u2605 Keep" : "\u2606 Keep"
+    )), /* @__PURE__ */ React.createElement("td", null, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        disabled: r.keep || leaving || controller.scanning || !navigation.leave,
+        onClick: () => setConfirmLeave([r.guildId])
+      },
+      "Leave server"
+    ))))))), !selected.length && /* @__PURE__ */ React.createElement("p", { className: "sv-empty" }, snapshot ? "No servers match this view." : "Check Now to inspect currently loaded Discord metadata."), /* @__PURE__ */ React.createElement("div", { className: "sv-controls" }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        disabled: currentPage === 0,
+        onClick: () => setPage(currentPage - 1)
+      },
+      "Previous"
+    ), /* @__PURE__ */ React.createElement("span", null, "Page ", currentPage + 1, " of ", pages), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        disabled: currentPage + 1 >= pages,
+        onClick: () => setPage(currentPage + 1)
+      },
+      "Next"
+    ))), tab === "Statistics" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h2", null, "Statistics Dashboard"), /* @__PURE__ */ React.createElement("p", null, "Totals cover the full server list, including Keep servers. Inactivity bands overlap. \u201CToday\u201D is a rolling 24 hours; six months means 180 days."), /* @__PURE__ */ React.createElement("div", { className: "sv-stats" }, Object.entries(stats).map(([name, value]) => /* @__PURE__ */ React.createElement("div", { key: name }, /* @__PURE__ */ React.createElement("strong", null, value ?? "\u2014"), /* @__PURE__ */ React.createElement("span", null, name === "Total Servers" ? "Servers in Scan" : name))))), tab === "What Changed" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h2", null, "What Changed Since Last Scan"), /* @__PURE__ */ React.createElement("p", null, controller.cache.previous ? `${date(controller.cache.previous.at)} \u2192 ${date(snapshot?.at ?? null)}` : "Complete two full scans to compare results."), /* @__PURE__ */ React.createElement("p", null, "Changes describe local observations and time thresholds, not proof of server abandonment."), /* @__PURE__ */ React.createElement("ul", { className: "sv-changes" }, groups.map(([label, events]) => /* @__PURE__ */ React.createElement("li", { key: label }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => {
+          setIds([...new Set(events.map((e) => e.guildId))]);
+          setFilters([]);
+          setTab("Servers");
+        }
+      },
+      events.length,
+      " \xB7 ",
+      label
+    ), /* @__PURE__ */ React.createElement("small", null, events.map((e) => e.name).join(", "))))), controller.cache.previous && !changes.length && /* @__PURE__ */ React.createElement("p", null, "No meaningful changes."), /* @__PURE__ */ React.createElement("p", null, "Removed servers remain named here for this comparison; they cannot be opened from the current list.")), tab === "Diagnostics" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h2", null, "Local diagnostics"), /* @__PURE__ */ React.createElement("dl", null, Object.entries({
+      "Joined guild count (client)": controller.guildCounts.reported ?? "Unavailable",
+      "Loaded guild records (client)": controller.guildCounts.loaded ?? "Unavailable",
+      "Additional join-request entries": controller.guildCounts.requests ?? "Unavailable / not loaded",
+      "Guilds discovered in saved scan": records.length,
+      "Guilds scanned": records.length,
+      "Visible channels scanned": stats["Visible Channels Scanned"],
+      "Thread sources scanned": records.reduce(
+        (s, r) => s + r.evidence.threads,
+        0
+      ),
+      "Forum sources scanned": records.reduce(
+        (s, r) => s + r.evidence.forums,
+        0
+      ),
+      "Live results": records.filter((r) => r.freshness === "LIVE").length,
+      "Cached results": stats["Cached Results"],
+      "Partial results": stats["Partial Results"],
+      "Unknown results": stats["Unknown Activity"],
+      "Latest scan ms": snapshot?.durationMs ?? "\u2014",
+      "Average session scan ms": controller.scanTimes.length ? Math.round(
+        controller.scanTimes.reduce((a, b) => a + b, 0) / controller.scanTimes.length
+      ) : "\u2014",
+      "Cache bytes (UTF-8)": new TextEncoder().encode(
+        JSON.stringify(controller.cache)
+      ).length,
+      "Last full scan": date(snapshot?.at ?? null),
+      ...Object.fromEntries(
+        Object.entries(controller.diagnostics).map(
+          ([name, found]) => [name, found ? "Found" : "Unavailable"]
+        )
+      )
+    }).map(([key, value]) => /* @__PURE__ */ React.createElement(React.Fragment, { key }, /* @__PURE__ */ React.createElement("dt", null, key), /* @__PURE__ */ React.createElement("dd", null, value)))), /* @__PURE__ */ React.createElement("p", null, "Only loaded thread coverage is available in this alpha. Modules are discovered once per enable.")), tab === "Settings" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h2", null, "Settings"), /* @__PURE__ */ React.createElement("p", null, "Scans run only when you click Check Now. Opening ServerVitals shows saved results."), /* @__PURE__ */ React.createElement("p", null, "Activity cache:", " ", new TextEncoder().encode(JSON.stringify(controller.cache)).length.toLocaleString(), " ", "bytes (UTF-8 data). Includes at most the current and previous scan; repeated checks replace snapshots rather than append history. Storage containers may add overhead."), [
+      ["debug", "Debug Mode (aggregate counts only)"],
+      ["showSize", "Show Server Size column"],
+      ["hideKeep", "Hide Keep servers from the server view"]
+    ].map(([key, label]) => /* @__PURE__ */ React.createElement("label", { className: "sv-setting", key }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "checkbox",
+        checked: controller.settings[key],
+        onChange: (e) => {
+          void controller.updateSettings({ [key]: e.target.checked });
+        }
+      }
+    ), label)), /* @__PURE__ */ React.createElement("label", { className: "sv-setting" }, "Category thresholds in days (four increasing numbers)", /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        value: thresholds,
+        onChange: (e) => setThresholds(e.target.value)
+      }
+    )), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => {
+          const values = thresholds.split(",").map((v) => Number(v.trim()));
+          if (values.length !== 4 || !values.every(
+            (n, i) => Number.isFinite(n) && n >= 1 && n <= 36500 && (i === 0 || n > values[i - 1])
+          )) {
+            setNotice(
+              "Enter four increasing day thresholds, for example 7, 30, 180, 365."
+            );
+            return;
           }
-        },
-        "Clear activity cache"
-      ))),
-      tab === "Privacy" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h2", null, "Privacy & accuracy"), /* @__PURE__ */ React.createElement("p", null, "ServerVitals runs locally. It has no backend, analytics or telemetry. It does not access authentication tokens or read or cache message contents. Normal scanning sends zero network/API requests. Displaying server icons may load them from Discord\u2019s CDN."), /* @__PURE__ */ React.createElement("p", null, "Last Visible Activity is the newest trustworthy message Snowflake found in permitted, loaded channel metadata. Private channels and unloaded/archived threads are outside the observation. LIVE describes a local scan, not a fresh server response."), /* @__PURE__ */ React.createElement("h2", null, "AI Development Disclosure"), /* @__PURE__ */ React.createElement("p", null, "The initial ServerVitals codebase is 100% AI generated using OpenAI Codex. Future human contributions may change the codebase. Stable releases require the maintainer\u2019s manual installation, testing and evaluation."), /* @__PURE__ */ React.createElement("p", null, "This alpha has not completed that manual stability checklist."), /* @__PURE__ */ React.createElement("p", null, "ServerVitals is independent and unofficial, and is not affiliated with, endorsed by, sponsored by, or officially supported by Discord Inc., BetterDiscord, or Vencord. Client modifications may conflict with Discord\u2019s Terms or policies. Users install at their own discretion.")),
-      /* @__PURE__ */ React.createElement("footer", null, "Independent \xB7 Unofficial \xB7 AI-generated initial implementation \xB7 Testing build")
-    );
+          void controller.updateSettings({
+            thresholds: values
+          });
+          setNotice(
+            "Category thresholds saved. Statistics retain their named day ranges."
+          );
+        }
+      },
+      "Save thresholds"
+    ), /* @__PURE__ */ React.createElement("details", { className: "sv-reset" }, /* @__PURE__ */ React.createElement("summary", null, "Reset activity cache"), /* @__PURE__ */ React.createElement("p", null, "This clears current and previous observations, preserves Keep, and leaves the cache empty until you click Check Now. Older activity may then be unknown."), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        disabled: controller.scanning || leaving,
+        onClick: () => {
+          void controller.resetCache();
+        }
+      },
+      "Clear activity cache"
+    ))), tab === "Privacy" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h2", null, "Privacy & accuracy"), /* @__PURE__ */ React.createElement("p", null, "ServerVitals runs locally. It has no backend, analytics or telemetry. It does not access authentication tokens or read or cache message contents. Normal scanning sends zero network/API requests. Displaying server icons may load them from Discord\u2019s CDN."), /* @__PURE__ */ React.createElement("p", null, "Last Visible Activity is the newest trustworthy message Snowflake found in permitted, loaded channel metadata. Private channels and unloaded/archived threads are outside the observation. LIVE describes a local scan, not a fresh server response."), /* @__PURE__ */ React.createElement("h2", null, "AI Development Disclosure"), /* @__PURE__ */ React.createElement("p", null, "The initial ServerVitals codebase is 100% AI generated using OpenAI Codex. Future human contributions may change the codebase. Stable releases require the maintainer\u2019s manual installation, testing and evaluation."), /* @__PURE__ */ React.createElement("p", null, "This alpha has not completed that manual stability checklist."), /* @__PURE__ */ React.createElement("p", null, "ServerVitals is independent and unofficial, and is not affiliated with, endorsed by, sponsored by, or officially supported by Discord Inc., BetterDiscord, or Vencord. Client modifications may conflict with Discord\u2019s Terms or policies. Users install at their own discretion.")), /* @__PURE__ */ React.createElement("footer", null, "Independent \xB7 Unofficial \xB7 AI-generated initial implementation \xB7 Testing build"));
   }
   return function SafeDashboard() {
     return /* @__PURE__ */ React.createElement(Boundary, null, /* @__PURE__ */ React.createElement(Dashboard, null));

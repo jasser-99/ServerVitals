@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-alpha.5 — unreleased testing build
+
+- Add maintainer-supplied live BetterDiscord screenshots, redact two sensitive names/icons, and explain Unknown activity and independent cache fields.
+- Separate joined guild counts, loaded records, saved scan coverage and additional join-request entries; counts update locally without triggering scans.
+- Temporarily remove the dashboard search field following continued live BetterDiscord typing failures. Keep sorting and filters available.
+- Remove the ineffective keyboard interception workaround. No new release has been published for this local change.
+
 ## 0.1.0-alpha.4 — 2026-10-07
 
 Independent alpha; live typing verification and manual stability checklist pending.
