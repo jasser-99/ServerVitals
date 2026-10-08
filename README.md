@@ -30,9 +30,13 @@ Every row shows server name/icon, size when available, Last Visible Activity, La
 
 Maintainer-supplied live BetterDiscord screenshot, sorted by **Oldest Activity First**. Last Visible Activity, Last Scanned, cached evidence and confidence remain separate. The displayed server count and dates are examples from one account, not product limits or verified absolute server inactivity.
 
-![Live BetterDiscord dashboard showing Unknown activity results with sensitive names redacted](docs/screenshots/betterdiscord-unknown-redacted.png)
+| ServerVitals: Unknown activity                                                                                                                      | Discord: RP Server has no accessible text channels                                                        |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| ![Live BetterDiscord dashboard showing Unknown activity results with sensitive names redacted](docs/screenshots/betterdiscord-unknown-redacted.png) | ![Discord showing No text channels in RP Server](docs/screenshots/discord-rp-server-no-text-channels.png) |
 
 Live BetterDiscord example of **Unknown** activity, with two server names/icons redacted for privacy. A member count can be cached even when activity is Unknown. See the explanation below. These screenshots demonstrate the maintainer's installation, not completion of the stability checklist or live Vencord verification.
+
+The adjacent screenshot shows **RP Server** still listed in Discord while Discord displays **No text channels**. It may have no text channels or the account may lack access to them. This illustrates why ServerVitals reports Unknown; it does not establish that the server was deleted or that the account was banned.
 
 ## Features
 
