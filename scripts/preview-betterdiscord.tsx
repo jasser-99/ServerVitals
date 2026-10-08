@@ -87,3 +87,18 @@ root.render(
     </div>
   </div>,
 );
+// Reproduce a surrounding app keybind listener that redirects text focus.
+document.addEventListener(
+  "keydown",
+  (event) => {
+    if (
+      event.target instanceof HTMLInputElement &&
+      event.key !== "Tab" &&
+      event.key !== "Escape"
+    ) {
+      event.preventDefault();
+      document.querySelector<HTMLButtonElement>("button")?.focus();
+    }
+  },
+  true,
+);

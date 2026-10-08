@@ -1,6 +1,6 @@
 # Initial development report
 
-**ServerVitals 0.1.0-alpha.3 — independent alpha testing build.** Initial implementation 100% AI generated with OpenAI Codex. Manual live-client testing has not been completed. This report does not mark any release stable.
+**ServerVitals 0.1.0-alpha.4 — independent alpha testing build.** Initial implementation 100% AI generated with OpenAI Codex. Manual live-client testing has not been completed. This report does not mark any release stable.
 
 ## Delivered integrations
 

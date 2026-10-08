@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-alpha.4 — 2026-10-07
+
+Independent alpha; live typing verification and manual stability checklist pending.
+
+- Isolate dashboard text-entry keystrokes from surrounding client keybind handlers while preserving browser editing defaults, Tab and Escape. Listeners only apply to ServerVitals fields and are removed on unmount.
+- Add character-by-character typing, Backspace and focus-retention regression coverage with a host handler that steals input focus. The previous alpha fails this regression; the patch passes.
+
 ## 0.1.0-alpha.3 — 2026-10-07
 
 Independent alpha; manual stability checklist pending.

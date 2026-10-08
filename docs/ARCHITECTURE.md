@@ -1,6 +1,6 @@
 # ServerVitals architecture
 
-Version: **0.1.0-alpha.3**. Documentation and source researched on 2026-10-07.
+Version: **0.1.0-alpha.4**. Documentation and source researched on 2026-10-07.
 
 ## Research and decisions
 
@@ -109,3 +109,7 @@ Discord store names, method shapes, permissions, channel fields, thread maps, ro
 ## Explicit membership actions
 
 Both adapters discover the existing Discord module exposing `leaveGuild`. BetterDiscord uses Webpack export discovery; Vencord uses `findByPropsLazy`. No direct REST calls, tokens, or message bodies are used. The dashboard confirms the selected guild names before invoking Controller.leaveSelected. It validates account/generation, current guild membership, Keep and known ownership, deduplicates selections, invokes actions sequentially with 1.5 seconds between actions, saves successful removals, and stops at the first failure without retry. Disable/account changes prevent subsequent actions. Only scans are network-free; leaving causes Discord’s ordinary membership requests.
+
+## Text entry isolation
+
+While a dashboard is mounted, scoped window capture listeners stop propagation of keydown/keyup events originating in its text inputs, without preventDefault. Browser typing and editing shortcuts remain native; Tab/Escape and events outside ServerVitals pass through. Click/mousedown propagation is isolated on text fields. Unmount removes both listeners. This protects plain HTML inputs from surrounding client keybind handlers; synthetic tests reproduce a document handler redirecting focus and verify continuous character input and Backspace. These tests do not identify every live Discord focus interaction. No key values are logged or stored.

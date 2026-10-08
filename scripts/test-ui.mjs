@@ -164,7 +164,19 @@ try {
   await page.locator("tbody tr").first().waitFor();
   await page.getByRole("searchbox").fill("not matching");
   assert.equal(await page.locator("tbody tr").count(), 0);
-  await page.getByRole("searchbox").fill("Test");
+  await page.getByRole("searchbox").fill("");
+  await page.getByRole("searchbox").click();
+  await page.getByRole("searchbox").pressSequentially("Test", { delay: 80 });
+  assert.equal(await page.getByRole("searchbox").inputValue(), "Test");
+  assert.equal(
+    await page
+      .getByRole("searchbox")
+      .evaluate((element) => element === document.activeElement),
+    true,
+  );
+  await page.getByRole("searchbox").press("Backspace");
+  assert.equal(await page.getByRole("searchbox").inputValue(), "Tes");
+  await page.getByRole("searchbox").pressSequentially("t", { delay: 80 });
   assert.equal(await page.locator("tbody tr").count(), 1);
   await page.getByLabel("Sort by", { exact: true }).click();
   await page

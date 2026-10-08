@@ -63,6 +63,29 @@ export function createDashboard(
     }
   }
   function Dashboard() {
+    const dashboardRoot = React.useRef<HTMLElement>(null);
+    React.useEffect(() => {
+      const isolateTextKey = (event: KeyboardEvent) => {
+        const target = event.target;
+        if (
+          !(target instanceof HTMLInputElement) ||
+          !dashboardRoot.current?.contains(target) ||
+          target.type === "checkbox" ||
+          event.key === "Tab" ||
+          event.key === "Escape"
+        )
+          return;
+        // Preserve browser editing defaults, but keep host keybind handlers from
+        // redirecting focus or consuming keys in our plain HTML text fields.
+        event.stopImmediatePropagation();
+      };
+      window.addEventListener("keydown", isolateTextKey, true);
+      window.addEventListener("keyup", isolateTextKey, true);
+      return () => {
+        window.removeEventListener("keydown", isolateTextKey, true);
+        window.removeEventListener("keyup", isolateTextKey, true);
+      };
+    }, []);
     const revision = React.useSyncExternalStore(
       controller.subscribe,
       controller.getRevision,
@@ -135,7 +158,11 @@ export function createDashboard(
         setNotice("Discord navigation is unavailable in this client version.");
     };
     return (
-      <section className="sv-root" aria-label="ServerVitals dashboard">
+      <section
+        ref={dashboardRoot}
+        className="sv-root"
+        aria-label="ServerVitals dashboard"
+      >
         <style>{CSS}</style>
         <header className="sv-header">
           <div>
@@ -211,6 +238,8 @@ export function createDashboard(
                 Search servers
                 <input
                   type="search"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                   placeholder="Search server names…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -681,6 +710,8 @@ export function createDashboard(
               Category thresholds in days (four increasing numbers)
               <input
                 value={thresholds}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
                 onChange={(e) => setThresholds(e.target.value)}
               />
             </label>
