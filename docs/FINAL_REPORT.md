@@ -51,17 +51,9 @@ The synthetic screenshot is labeled and is not a live-client screenshot. Synthet
 
 ## Repository and publication status
 
-Git initialized on local branch `main` in this workspace. No GitHub CLI executable was available; no remote repository or GitHub release was created. No Git author identity was configured, so no author identity was invented and no initial commit was made. Source remains available locally for review and publication. Nothing was submitted to BetterDiscord or Vencord.
+Source published on 2026-10-07 to the public repository [jasser-99/ServerVitals](https://github.com/jasser-99/ServerVitals), branch `main`. GitHub topics and description are configured. The maintainer account's GitHub noreply address is used for the repository-local commit identity.
 
-To publish later, configure your own Git identity, commit the reviewed files, then use an authenticated GitHub CLI:
-
-```sh
-git add .
-git commit -m "Initial ServerVitals alpha"
-gh repo create ServerVitals --public --source . --remote origin --push --description "Find inactive Discord servers by viewing, sorting, and analyzing their last visible activity. Supports BetterDiscord and Vencord."
-```
-
-Use the suggested topics from the project brief. Any release made before manual testing must be explicitly marked **prerelease** and include the Testing Build warning. CI does not publish releases. Do not distribute the validation checkout's Vencord build.
+The initial source and distributable artifacts are available in the repository. Releases before manual testing must be explicitly marked **prerelease** and include the Testing Build warning. CI does not publish releases. Nothing was submitted to BetterDiscord or Vencord. Do not distribute the validation checkout's Vencord build.
 
 ## Manual next step and limitations
 
@@ -69,4 +61,4 @@ Complete [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) in both clients. Start wit
 
 Accuracy is limited to permitted loaded metadata; private channels and unloaded/archived threads are not represented. Empty and uninitialized sources can be indistinguishable. Forum parents do not prove newest reply activity. Local member counts can be stale. Discord internal stores, field names, permission methods and navigation/modal signatures may change, even when source compilation passes.
 
-There are no known failing automated checks preventing an explicitly labeled source alpha. **Live client validation remains outstanding and prevents a verified compatibility/stability claim. GitHub publication remains undone because CLI/author setup was unavailable.**
+There are no known failing automated checks preventing an explicitly labeled source alpha. **Live client validation remains outstanding and prevents a verified compatibility/stability claim. The source is now publicly available on GitHub.**
